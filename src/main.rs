@@ -6,12 +6,13 @@ use std::str;
 
 const VERSION: &str = "0.0.0";
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let reporoot = match getrootdir() {
         Ok(r) => r,
         Err(e) => {
-            println!("{}", e);
-            panic!("please run meow in a git repository");
+            println!("root directory not detected.");
+            println!("please run meow in a git repository");
+            return Err(e.into());
         }
     };
 
@@ -29,12 +30,14 @@ fn main() {
     stageall(&reporoot);
 
     println!("\ncommitting...");
-    commit(&reporoot, "testing");
+    let message = args[1..].join(" ");
+    commit(&reporoot, &message);
 
     println!("\npushing...");
     push(&reporoot, Some("main"));
 
     println!("\n😼");
+    Ok(())
 }
 
 fn getrootdir() -> Result<PathBuf, std::io::Error> {
