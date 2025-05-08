@@ -1,3 +1,4 @@
+use std::env;
 use std::io::{Error, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -17,15 +18,22 @@ fn main() {
     println!("meower rust beta");
     println!("version {}", VERSION);
     println!("\nrepository root: {}", reporoot.to_string_lossy());
+
+    let args: Vec<String> = env::args().collect();
+    if args.is_empty() {
+        println!("no commit message");
+        panic!("please run meow <commit message>");
+    }
+
     println!("\nstaging changes...");
     stageall(&reporoot);
-    println!("success");
+
     println!("\ncommitting...");
     commit(&reporoot, "testing");
-    println!("success");
+
     println!("\npushing...");
     push(&reporoot, Some("main"));
-    println!("success");
+
     println!("\n😼");
 }
 
