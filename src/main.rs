@@ -119,9 +119,13 @@ fn push(repopath: &Path, upstream: Option<&str>) -> Result<(), String> {
 
     match rungitcommand(repopath, &args) {
         Ok(o) => {
-            println!("pushed to remote {:?}", upstream);
+            if let Some(branch) = upstream {
+                println!("pushed to remote {}", branch);
+            } else {
+                println!("pushed to remote");
+            }
+            Ok(())
         }
-        Err(e) => panic!("could not push to remote {:?}", upstream),
+        Err(e) => Err(format!("could not push to remote: {:?}", e)),
     }
-    Ok(())
 }
