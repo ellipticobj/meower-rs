@@ -11,7 +11,7 @@ keywords = ["git", "git-wrapper", "meow", "meower", "tool"]
 categories = ["git", "command-line-tool"]
 
 [dependencies]
-clap = "4.5.37"
+clap = { version = "4.5.37", features = ["derive"] }
 console = "0.15.11"
 dialoguer = "0.11.0"
 indicatif = "0.17.11"

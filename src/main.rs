@@ -4,37 +4,48 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::str;
 
-const VERSION: &str = "0.0.0";
+use clap::{Parser, arg, command};
+
+const VERSION: &str = "0.0.0a-rs";
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    commitmessage: Option<String>,
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("meower");
+    println!("version {}", VERSION);
+
     let reporoot = match getrootdir() {
         Ok(r) => r,
-        Err(e) => {
-            println!("root directory not detected.");
-            println!("please run meow in a git repository");
-            return Err(e.into());
+        Err(_e) => {
+            eprintln!("\nroot directory not detected");
+            eprintln!("please run meow in a git repository");
+            std::process::exit(1);
         }
     };
-
-    println!("meower rust beta");
-    println!("version {}", VERSION);
     println!("\nrepository root: {}", reporoot.to_string_lossy());
 
-    let args: Vec<String> = env::args().collect();
-    if args.is_empty() {
-        println!("no commit message");
-        panic!("please run meow <commit message>");
-    }
+    let args = Args::parse();
+    let message = match args.commitmessage {
+        Some(message) => message,
+        None => {
+            eprintln!("\ncommit message not specified");
+            std::process::exit(1);
+        }
+    };
+    let message: &str = &message;
 
-    println!("\nstaging changes...");
-    stageall(&reporoot);
+    println!("staging changes...");
+    stageall(&reporoot)?;
 
     println!("\ncommitting...");
-    let message = args[1..].join(" ");
-    commit(&reporoot, &message);
+    commit(&reporoot, &message)?;
 
     println!("\npushing...");
-    push(&reporoot, Some("main"));
+    push(&reporoot, Some("main"))?;
 
     println!("\n😼");
     Ok(())
@@ -94,7 +105,7 @@ fn rungitcommand(repopath: &Path, args: &[&str]) -> Result<Output, String> {
 fn stageall(repopath: &Path) -> Result<(), String> {
     let args = &["add", "*"];
     match rungitcommand(repopath, args) {
-        Ok(o) => {
+        Ok(_o) => {
             println!("staged all files");
         }
         Err(e) => panic!("could not stage all files: {}", e),
@@ -106,7 +117,7 @@ fn commit(repopath: &Path, message: &str) -> Result<(), String> {
     let args = &["commit", "-m", message];
 
     match rungitcommand(repopath, args) {
-        Ok(o) => {
+        Ok(_o) => {
             println!("commited all changes");
         }
         Err(e) => panic!("could not commit files: {}", e),
@@ -121,7 +132,7 @@ fn push(repopath: &Path, upstream: Option<&str>) -> Result<(), String> {
     }
 
     match rungitcommand(repopath, &args) {
-        Ok(o) => {
+        Ok(_o) => {
             if let Some(branch) = upstream {
                 println!("pushed to remote {}", branch);
             } else {
