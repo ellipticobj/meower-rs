@@ -108,7 +108,7 @@ fn getrootdir() -> Result<PathBuf, std::io::Error> {
 }
 
 fn printcommand(command: &Vec<&str>) {
-    println!("{}", command.join(""));
+    println!("{}", command.join(" "));
 }
 
 fn printcommandoutput(output: Output) {
