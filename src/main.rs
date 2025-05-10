@@ -11,6 +11,10 @@ const VERSION: &str = "0.0.0a-rs";
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
+    #[arg(short, long)]
+    add: Option<Vec<String>>,
+
+    #[arg(name = "commitmessage")]
     commitmessage: Option<String>,
 }
 
@@ -38,8 +42,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let message: &str = &message;
 
-    println!("staging changes...");
-    stageall(&reporoot)?;
+    println!("\nstaging changes...");
+    match args.add {
+        Some(toadd) => match stage(&reporoot, &toadd) {
+            _ => (),
+        },
+        None => match stageall(&reporoot) {
+            _ => (),
+        },
+    }
 
     println!("\ncommitting...");
     commit(&reporoot, &message)?;
@@ -89,6 +100,8 @@ fn rungitcommand(repopath: &Path, args: &[&str]) -> Result<Output, String> {
     command.current_dir(repopath);
     command.args(args);
 
+    println!("{:?}", command);
+
     match command.output() {
         Ok(output) => {
             if output.status.success() {
@@ -109,6 +122,22 @@ fn stageall(repopath: &Path) -> Result<(), String> {
             println!("staged all files");
         }
         Err(e) => panic!("could not stage all files: {}", e),
+    }
+    Ok(())
+}
+
+fn stage(repopath: &Path, files: &[String]) -> Result<(), String> {
+    let mut args = vec!["add".to_owned()];
+    args.extend(files.iter().map(|s| s.to_owned()).collect::<Vec<String>>());
+
+    match rungitcommand(
+        repopath,
+        &args.iter().map(|a| a.as_str()).collect::<Vec<&str>>(),
+    ) {
+        Ok(_o) => {
+            println!("staged files");
+        }
+        Err(e) => panic!("could not stage files {}: {}", files.join(""), e),
     }
     Ok(())
 }
