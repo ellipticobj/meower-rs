@@ -1,10 +1,10 @@
-use std::env;
-use std::io::{Error, ErrorKind};
-use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
-use std::str;
-
 use clap::{Parser, arg, command};
+use std::{
+    io::{Error, ErrorKind},
+    path::{Path, PathBuf},
+    process::{Command, Output},
+    str,
+};
 
 const VERSION: &str = "0.0.0a-rs";
 
@@ -13,6 +13,9 @@ const VERSION: &str = "0.0.0a-rs";
 struct Args {
     #[arg(short, long)]
     add: Option<Vec<String>>,
+
+    #[arg(short = 'd', long = "dry-run")]
+    dryrun: bool,
 
     #[arg(name = "commitmessage")]
     commitmessage: Option<String>,
@@ -33,6 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nrepository root: {}", reporoot.to_string_lossy());
 
     let args = Args::parse();
+    let dryrun = args.dryrun;
     let message = match args.commitmessage {
         Some(message) => message,
         None => {
@@ -42,9 +46,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let message: &str = &message;
 
+    if dryrun {
+        println!("dry run")
+    }
+
     println!("\nstaging changes...");
     match args.add {
-        Some(toadd) => match stage(&reporoot, &toadd) {
+        Some(toadd) => match stage(&reporoot, &toadd, &dryrun) {
             _ => (),
         },
         None => match stageall(&reporoot) {
@@ -53,10 +61,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("\ncommitting...");
-    commit(&reporoot, &message)?;
+    commit(&reporoot, &message, &dryrun)?;
 
     println!("\npushing...");
-    push(&reporoot, Some("main"))?;
+    push(&reporoot, Some("main"), &dryrun)?;
+
+    if dryrun {
+        println!("\ndry run complete")
+    }
 
     println!("\n😼");
     Ok(())
@@ -95,80 +107,139 @@ fn getrootdir() -> Result<PathBuf, std::io::Error> {
     }
 }
 
-fn rungitcommand(repopath: &Path, args: &[&str]) -> Result<Output, String> {
-    let mut command = Command::new("git");
-    command.current_dir(repopath);
-    command.args(args);
+fn printcommand(command: &Vec<&str>) {
+    println!("{}", command.join(""));
+}
 
-    println!("{:?}", command);
+fn printcommandoutput(output: Output) {
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let trimmed = stdout.trim();
+    if !trimmed.is_empty() {
+        println!("{}", trimmed);
+    }
+}
 
-    match command.output() {
-        Ok(output) => {
-            if output.status.success() {
-                Ok(output)
+fn createcommand<'a>(args: &[&'a str]) -> Vec<&'a str> {
+    let mut command = vec!["git"];
+    command.extend(args);
+
+    command
+}
+
+fn runcommand(repopath: &Path, args: &[&str]) -> Result<Output, String> {
+    let commandparts = createcommand(args);
+    printcommand(&commandparts);
+
+    if commandparts.is_empty() {
+        return Err("cannot execute an empty command.".to_string());
+    }
+
+    let command = commandparts[0];
+    let commandargs = &commandparts[1..];
+
+    let mut cmd = Command::new(command);
+    cmd.args(commandargs);
+    cmd.current_dir(repopath);
+
+    match cmd.output() {
+        Ok(o) => {
+            if o.status.success() {
+                Ok(o)
             } else {
-                let stderr = str::from_utf8(&output.stderr).unwrap_or("failed to read stderr");
-                Err(format!("git command failed: {}", stderr))
+                let stderr = str::from_utf8(&o.stderr)
+                    .unwrap_or("failed to read stderr (non-utf8)")
+                    .trim();
+                Err(format!(
+                    "command `{:?}` executed in `{}` failed with: {}",
+                    commandparts,
+                    repopath.display(),
+                    stderr
+                ))
             }
         }
-        Err(e) => Err(format!("failed to execute git command: {}", e)),
+        Err(e) => Err(format!(
+            "failed to execute command `{:?}` in directory `{}`: {}",
+            commandparts,
+            repopath.display(),
+            e
+        )),
     }
 }
 
 fn stageall(repopath: &Path) -> Result<(), String> {
     let args = &["add", "*"];
-    match rungitcommand(repopath, args) {
-        Ok(_o) => {
+    match runcommand(repopath, args) {
+        Ok(o) => {
+            printcommandoutput(o);
             println!("staged all files");
+            Ok(())
         }
-        Err(e) => panic!("could not stage all files: {}", e),
+        Err(e) => Err(format!("could not stage all files: {}", e)),
     }
-    Ok(())
 }
 
-fn stage(repopath: &Path, files: &[String]) -> Result<(), String> {
+fn stage(repopath: &Path, files: &[String], dryrun: &bool) -> Result<(), String> {
     let mut args = vec!["add".to_owned()];
     args.extend(files.iter().map(|s| s.to_owned()).collect::<Vec<String>>());
 
-    match rungitcommand(
-        repopath,
-        &args.iter().map(|a| a.as_str()).collect::<Vec<&str>>(),
-    ) {
-        Ok(_o) => {
-            println!("staged files");
+    if !dryrun.to_owned() {
+        match runcommand(
+            repopath,
+            &args.iter().map(|a| a.as_str()).collect::<Vec<&str>>(),
+        ) {
+            Ok(o) => {
+                printcommandoutput(o);
+                println!("staged files");
+            }
+            Err(e) => panic!("could not stage files {}: {}", files.join(""), e),
         }
-        Err(e) => panic!("could not stage files {}: {}", files.join(""), e),
+    } else {
+        printcommand(&args.iter().map(|a| a.as_str()).collect::<Vec<&str>>())
     }
+
     Ok(())
 }
 
-fn commit(repopath: &Path, message: &str) -> Result<(), String> {
+fn commit(repopath: &Path, message: &str, dryrun: &bool) -> Result<(), String> {
     let args = &["commit", "-m", message];
 
-    match rungitcommand(repopath, args) {
-        Ok(_o) => {
-            println!("commited all changes");
+    if !dryrun.to_owned() {
+        match runcommand(repopath, args) {
+            Ok(o) => {
+                printcommandoutput(o);
+                println!("commited all changes");
+            }
+            Err(e) => panic!("could not commit files: {}", e),
         }
-        Err(e) => panic!("could not commit files: {}", e),
+    } else {
+        printcommand(&args.iter().map(|a| a.to_owned()).collect::<Vec<&str>>())
     }
+
     Ok(())
 }
 
-fn push(repopath: &Path, upstream: Option<&str>) -> Result<(), String> {
+fn push(repopath: &Path, upstream: Option<&str>, dryrun: &bool) -> Result<(), String> {
     let mut args = vec!["push"];
-    if let Some(upstream) = upstream {
-        args.extend(["--set-upstream", "origin", upstream]);
+    if let Some(upstream_val) = upstream {
+        // Changed variable name for clarity, original was fine too
+        args.extend(["--set-upstream", "origin", upstream_val]);
     }
 
-    match rungitcommand(repopath, &args) {
-        Ok(_o) => {
-            if let Some(branch) = upstream {
-                println!("pushed to remote {}", branch);
-            } else {
-                println!("pushed to remote");
+    if !dryrun.to_owned() {
+        match runcommand(repopath, &args) {
+            Ok(o) => {
+                printcommandoutput(o);
+                if let Some(branch) = upstream {
+                    println!("pushed to remote {}", branch);
+                } else {
+                    println!("pushed to remote");
+                }
+                Ok(())
             }
-            Ok(())
+            Err(e) => Err(format!("could not push to remote: {:?}", e)),
         }
-        Err(e) => Err(format!("could not push to remote: {:?}", e)),
+    } else {
+        printcommand(&args);
+        Ok(())
     }
 }
