@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("dry run")
     }
 
-    println!("staging changes...");
+    println!("{}", style("staging changes...").magenta());
     match args.add {
         Some(toadd) => match stage(&reporoot, &toadd, &dryrun) {
             _ => (),
@@ -61,10 +61,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     }
 
-    println!("\ncommitting...");
+    println!("{}", style("\ncommitting...").magenta());
     commit(&reporoot, &message, &dryrun)?;
 
-    println!("\npushing...");
+    println!("{}", style("\npushing...").magenta());
     push(&reporoot, Some("main"), &dryrun)?;
 
     if dryrun {
