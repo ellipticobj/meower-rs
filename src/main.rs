@@ -1,4 +1,5 @@
 use clap::{Parser, arg, command};
+use console::{Term, style};
 use std::{
     io::{Error, ErrorKind},
     path::{Path, PathBuf},
@@ -33,14 +34,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         }
     };
-    println!("\nrepository root: {}", reporoot.to_string_lossy());
+    println!("\nrepository root: {}\n", reporoot.to_string_lossy());
 
     let args = Args::parse();
     let dryrun = args.dryrun;
     let message = match args.commitmessage {
         Some(message) => message,
         None => {
-            eprintln!("\ncommit message not specified");
+            printerror("\ncommit message not specified");
             std::process::exit(1);
         }
     };
@@ -50,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("dry run")
     }
 
-    println!("\nstaging changes...");
+    println!("staging changes...");
     match args.add {
         Some(toadd) => match stage(&reporoot, &toadd, &dryrun) {
             _ => (),
@@ -108,15 +109,28 @@ fn getrootdir() -> Result<PathBuf, std::io::Error> {
 }
 
 fn printcommand(command: &Vec<&str>) {
-    println!("{}", command.join(" "));
+    println!("  {}", style(command.join(" ")).cyan());
 }
 
 fn printcommandoutput(output: Output) {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let trimmed = stdout.trim();
     if !trimmed.is_empty() {
-        println!("{}", trimmed);
+        println!("    {}", style(trimmed).green());
     }
+}
+
+fn printerror(error: &str) {
+    let term = Term::stderr();
+    term.write_line(&format!("{}", style("error: ").red()))
+        .unwrap();
+    term.write_line(&format!("  {}", style(error).red()))
+        .unwrap();
+    term.write_line(&format!(
+        "{}",
+        style("run `meow -h` for detailed help").red()
+    ))
+    .unwrap();
 }
 
 fn createcommand<'a>(args: &[&'a str]) -> Vec<&'a str> {
@@ -151,9 +165,9 @@ fn runcommand(repopath: &Path, args: &[&str]) -> Result<Output, String> {
                     .trim();
                 Err(format!(
                     "command `{:?}` executed in `{}` failed with: {}",
-                    commandparts,
+                    style(commandparts.join(" ")).yellow(),
                     repopath.display(),
-                    stderr
+                    style(stderr).red()
                 ))
             }
         }
@@ -171,7 +185,7 @@ fn stageall(repopath: &Path) -> Result<(), String> {
     match runcommand(repopath, args) {
         Ok(o) => {
             printcommandoutput(o);
-            println!("staged all files");
+            println!("{}", style("staged all files").magenta());
             Ok(())
         }
         Err(e) => Err(format!("could not stage all files: {}", e)),
@@ -189,7 +203,7 @@ fn stage(repopath: &Path, files: &[String], dryrun: &bool) -> Result<(), String>
         ) {
             Ok(o) => {
                 printcommandoutput(o);
-                println!("staged files");
+                println!("{}", style("staged files").magenta());
             }
             Err(e) => panic!("could not stage files {}: {}", files.join(""), e),
         }
@@ -207,7 +221,7 @@ fn commit(repopath: &Path, message: &str, dryrun: &bool) -> Result<(), String> {
         match runcommand(repopath, args) {
             Ok(o) => {
                 printcommandoutput(o);
-                println!("commited all changes");
+                println!("{}", style("commited all changes").magenta());
             }
             Err(e) => panic!("could not commit files: {}", e),
         }
@@ -230,13 +244,16 @@ fn push(repopath: &Path, upstream: Option<&str>, dryrun: &bool) -> Result<(), St
             Ok(o) => {
                 printcommandoutput(o);
                 if let Some(branch) = upstream {
-                    println!("pushed to remote {}", branch);
+                    println!(
+                        "{}",
+                        style(format!("pushed to remote {}", branch)).magenta()
+                    );
                 } else {
-                    println!("pushed to remote");
+                    println!("{}", style("pushed to remote").magenta());
                 }
                 Ok(())
             }
-            Err(e) => Err(format!("could not push to remote: {:?}", e)),
+            Err(e) => Err(format!("could not push to remote: {:?}", style(e).red())),
         }
     } else {
         printcommand(&args);
