@@ -1,12 +1,11 @@
-use crate::args::Args;
-use crate::loggers::*;
+use crate::{args::Args, loggers::*};
 use clap::Parser;
 use console::{Emoji, style};
 use homedir::my_home;
 use std::{
     io::{Error, ErrorKind},
     path::{Path, PathBuf},
-    process::{Command, Output},
+    process::{Command, Output, exit},
     str,
 };
 
@@ -16,8 +15,13 @@ mod loggers;
 const VERSION: &str = "0.0.0a-rs";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Args::parse();
+
     println!("{}", style("meower").cyan());
-    println!("{}", style(format!("version {}", VERSION)).cyan());
+    if args.version {
+        println!("{}", style(format!("version {}", VERSION)).cyan());
+        return Ok(());
+    }
 
     let reporoot = getrootdir()?;
     let root = getcleanroot(&reporoot)?;
@@ -28,13 +32,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         style(root).magenta()
     );
 
-    let args = Args::parse();
     let dryrun = args.dryrun;
     let message = match args.commitmessage {
         Some(message) => message,
         None => {
             fatalerror("\ncommit message not specified");
-            std::process::exit(1);
+            exit(1);
         }
     };
 
@@ -45,9 +48,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     info("staging changes...");
     match args.add {
         Some(toadd) => match stage(&reporoot, &toadd, &dryrun) {
+            Err(e) => {
+                error(&e);
+                exit(1);
+            }
             _ => (),
         },
         None => match stageall(&reporoot) {
+            Err(e) => {
+                error(&e);
+                exit(1);
+            }
             _ => (),
         },
     }
@@ -171,10 +182,9 @@ fn stageall(repopath: &Path) -> Result<(), String> {
     match runcommand(repopath, args) {
         Ok(o) => {
             printcommandoutput(o);
-            println!("{}", style("staged all files").magenta());
             Ok(())
         }
-        Err(e) => Err(format!("could not stage all files: {}", e)),
+        Err(e) => Err(format!("could not stage all: {}", e)),
     }
 }
 
@@ -182,40 +192,51 @@ fn stage(repopath: &Path, files: &[String], dryrun: &bool) -> Result<(), String>
     let mut args = vec!["add".to_owned()];
     args.extend(files.iter().cloned());
 
-    if !dryrun.to_owned() {
+    if !*dryrun {
         match runcommand(
             repopath,
             &args.iter().map(|a| a.as_str()).collect::<Vec<&str>>(),
         ) {
             Ok(o) => {
                 printcommandoutput(o);
-                println!("{}", style("staged files").magenta());
+                Ok(())
             }
-            Err(e) => panic!("could not stage files {:?}: {}", files, e),
+            Err(e) => {
+                if e.contains("did not match any files") {
+                    Err(format!(
+                        "    could not stage files: \n      `{}`\n    files not found",
+                        files.join(", ")
+                    ))
+                } else {
+                    Err(format!(
+                        "    could not stage files: \n      `{}`",
+                        files.join(", ")
+                    ))
+                }
+            }
         }
     } else {
-        printcommand(&args.iter().map(|a| a.as_str()).collect::<Vec<&str>>())
+        printcommand(&args.iter().map(|a| a.as_str()).collect::<Vec<&str>>());
+        Ok(())
     }
-
-    Ok(())
 }
 
 fn commit(repopath: &Path, message: &str, dryrun: &bool) -> Result<(), String> {
     let args = &["commit", "-m", message];
 
-    if !dryrun.to_owned() {
+    if *dryrun {
+        printcommand(&args.to_vec());
+        Ok(())
+    } else {
         match runcommand(repopath, args) {
             Ok(o) => {
                 printcommandoutput(o);
                 println!("{}", style("commited all changes").magenta());
+                Ok(())
             }
-            Err(e) => panic!("could not commit files: {}", e),
+            Err(e) => Err(format!("could not commit files: {}", e)),
         }
-    } else {
-        printcommand(&args.iter().map(|a| a.to_owned()).collect::<Vec<&str>>())
     }
-
-    Ok(())
 }
 
 fn push(repopath: &Path, upstream: Option<&str>, dryrun: &bool) -> Result<(), String> {
