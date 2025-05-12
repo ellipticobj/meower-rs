@@ -32,6 +32,10 @@ pub fn error(text: &str) {
     term.write_line(&format!("{}", style(text).red())).unwrap();
 }
 
+pub fn important(text: &str) {
+    println!("{}", style(text).cyan());
+}
+
 pub fn info(text: &str) {
     println!("{}", style(text).magenta());
 }

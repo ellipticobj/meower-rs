@@ -17,9 +17,10 @@ const VERSION: &str = "0.0.0a-rs";
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
-    println!("{}", style("meower").cyan());
+    important("meow");
+    important(&format!("version {}", VERSION));
+
     if args.version {
-        println!("{}", style(format!("version {}", VERSION)).cyan());
         return Ok(());
     }
 
@@ -27,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let root = getcleanroot(&reporoot)?;
 
     println!(
-        "\n{} {}\n",
+        "{} {}\n",
         style("repository root:").cyan(),
         style(root).magenta()
     );
