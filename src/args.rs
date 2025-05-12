@@ -38,4 +38,13 @@ pub struct Args {
 
     #[arg(long = "meow", hide(true))]
     pub meow: bool,
+
+    #[arg(long = "set-upstream", short = 'u', help = "sets upstream")]
+    pub upstream: Option<String>,
+
+    #[arg(long = "force", short = 'f', help = "adds --force-with-lease")]
+    pub force: bool,
+
+    #[arg(long = "force-without-lease", short = 'F', help = "adds --force")]
+    pub forceforce: bool,
 }

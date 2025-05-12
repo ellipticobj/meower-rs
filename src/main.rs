@@ -45,6 +45,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let dryrun = args.dryrun;
+    let force = args.force;
+    let forceforce = args.forceforce;
     let message = match args.commitmessage {
         Some(message) => message,
         None => {
@@ -81,7 +83,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     success("done");
 
     info("\npushing...");
-    push(&reporoot, Some("main"), &dryrun)?;
+    if let Some(upstream) = args.upstream {
+        push(&reporoot, Some(&upstream), &dryrun, &force, &forceforce)?;
+    } else {
+        push(&reporoot, None, &dryrun, &force, &forceforce)?;
+    }
     success("done");
 
     if dryrun {
@@ -190,7 +196,7 @@ fn runcommand(repopath: &Path, args: &[&str]) -> Result<Output, String> {
 }
 
 fn stageall(repopath: &Path) -> Result<(), String> {
-    let args = &["add", "*"];
+    let args = &["add", "."];
     match runcommand(repopath, args) {
         Ok(o) => {
             printcommandoutput(o);
@@ -250,14 +256,25 @@ fn commit(repopath: &Path, message: &str, dryrun: &bool) -> Result<(), String> {
     }
 }
 
-fn push(repopath: &Path, upstream: Option<&str>, dryrun: &bool) -> Result<(), String> {
+fn push(
+    repopath: &Path,
+    upstream: Option<&str>,
+    dryrun: &bool,
+    force: &bool,
+    forceforce: &bool,
+) -> Result<(), String> {
     let mut args = vec!["push"];
-    if let Some(upstream_val) = upstream {
-        // Changed variable name for clarity, original was fine too
-        args.extend(["--set-upstream", "origin", upstream_val]);
+    if let Some(upstreamval) = upstream {
+        args.extend(["--set-upstream", "origin", upstreamval]);
+    }
+    if *force {
+        args.extend(["--force-with-lease"])
+    }
+    if *forceforce {
+        args.extend(["--force"])
     }
 
-    if !dryrun.to_owned() {
+    if !*dryrun {
         match runcommand(repopath, &args) {
             Ok(o) => {
                 printcommandoutput(o);
@@ -268,7 +285,7 @@ fn push(repopath: &Path, upstream: Option<&str>, dryrun: &bool) -> Result<(), St
                 }
                 Ok(())
             }
-            Err(e) => Err(format!("could not push to remote: {:?}", style(e).red())),
+            Err(e) => Err(format!("could not push to remote: {}", style(e).red())),
         }
     } else {
         printcommand(&args);
