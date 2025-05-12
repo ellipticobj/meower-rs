@@ -17,10 +17,17 @@ const VERSION: &str = "0.0.1-rs";
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
+    if args.meow {
+        info("meow meow :3");
+        return Ok(());
+    }
+
     important("\nmeow");
     important(&format!("version {}", VERSION));
 
-    if args.version {
+    if args.help {
+        println!();
+        printhelp();
         return Ok(());
     }
 
@@ -32,6 +39,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         style("repository root:").cyan(),
         style(root).magenta()
     );
+
+    if args.version {
+        return Ok(());
+    }
 
     let dryrun = args.dryrun;
     let message = match args.commitmessage {
