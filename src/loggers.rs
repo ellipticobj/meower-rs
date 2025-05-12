@@ -7,9 +7,10 @@ pub fn printcommand(command: &Vec<&str>) {
 
 pub fn printcommandoutput(output: Output) {
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let trimmed = stdout.trim();
-    if !trimmed.is_empty() {
-        println!("    {}", style(trimmed).green());
+    if !stdout.trim().is_empty() {
+        for line in stdout.lines() {
+            info(&format!("    {}", line));
+        }
     }
 }
 

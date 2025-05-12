@@ -251,12 +251,9 @@ fn push(repopath: &Path, upstream: Option<&str>, dryrun: &bool) -> Result<(), St
             Ok(o) => {
                 printcommandoutput(o);
                 if let Some(branch) = upstream {
-                    println!(
-                        "{}",
-                        style(format!("pushed to remote {}", branch)).magenta()
-                    );
+                    success(&format!("  pushed to remote {}", branch));
                 } else {
-                    println!("{}", style("pushed to remote").magenta());
+                    success("  pushed to remote");
                 }
                 Ok(())
             }
