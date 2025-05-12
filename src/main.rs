@@ -12,12 +12,12 @@ use std::{
 mod args;
 mod loggers;
 
-const VERSION: &str = "0.0.0a-rs";
+const VERSION: &str = "0.0.1-rs";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
-    important("meow");
+    important("\nmeow");
     important(&format!("version {}", VERSION));
 
     if args.version {
@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let message = match args.commitmessage {
         Some(message) => message,
         None => {
-            fatalerror("\ncommit message not specified");
+            fatalerror("commit message not specified\n");
             exit(1);
         }
     };
