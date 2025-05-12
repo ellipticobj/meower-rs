@@ -4,13 +4,15 @@
 a rust rewrite of the [original meower](https://github.com/ellipticobj/meower)
 
 # in progress
-- [ ] custom --version styling
+
 - [ ] custom clap error output
-- [ ] add flags for commit message
+- [ ] add progress bars + spinners
 - [ ] add flags for setting upstream
-- [x] add flags for staging certain files
 - [ ] add flags for running git commands
 - [x] proper output
-- [ ] fix commit output printing
+- [x] custom --version styling
+- [x] fix commit output printing
+- [x] add flags for commit message
+- [x] add flags for staging certain files
 - [x] add functions to print normal output, logs, errors, etc
-- [ ] exit gracefully instead of panicking when the command returns an error
+- [x] exit gracefully instead of panicking when the command returns an error

@@ -231,7 +231,6 @@ fn commit(repopath: &Path, message: &str, dryrun: &bool) -> Result<(), String> {
         match runcommand(repopath, args) {
             Ok(o) => {
                 printcommandoutput(o);
-                println!("{}", style("commited all changes").magenta());
                 Ok(())
             }
             Err(e) => Err(format!("could not commit files: {}", e)),
