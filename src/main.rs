@@ -1,5 +1,8 @@
-use clap::{Parser, arg, command};
-use console::{Term, style};
+use crate::args::Args;
+use crate::loggers::*;
+use clap::Parser;
+use console::{Emoji, style};
+use homedir::my_home;
 use std::{
     io::{Error, ErrorKind},
     path::{Path, PathBuf},
@@ -7,51 +10,39 @@ use std::{
     str,
 };
 
+mod args;
+mod loggers;
+
 const VERSION: &str = "0.0.0a-rs";
 
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct Args {
-    #[arg(short, long)]
-    add: Option<Vec<String>>,
-
-    #[arg(short = 'd', long = "dry-run")]
-    dryrun: bool,
-
-    #[arg(name = "commitmessage")]
-    commitmessage: Option<String>,
-}
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("meower");
-    println!("version {}", VERSION);
+    println!("{}", style("meower").cyan());
+    println!("{}", style(format!("version {}", VERSION)).cyan());
 
-    let reporoot = match getrootdir() {
-        Ok(r) => r,
-        Err(_e) => {
-            eprintln!("\nroot directory not detected");
-            eprintln!("please run meow in a git repository");
-            std::process::exit(1);
-        }
-    };
-    println!("\nrepository root: {}\n", reporoot.to_string_lossy());
+    let reporoot = getrootdir()?;
+    let root = getcleanroot(&reporoot)?;
+
+    println!(
+        "\n{} {}\n",
+        style("repository root:").cyan(),
+        style(root).magenta()
+    );
 
     let args = Args::parse();
     let dryrun = args.dryrun;
     let message = match args.commitmessage {
         Some(message) => message,
         None => {
-            printerror("\ncommit message not specified");
+            fatalerror("\ncommit message not specified");
             std::process::exit(1);
         }
     };
-    let message: &str = &message;
 
     if dryrun {
-        println!("dry run")
+        info("dry run\n");
     }
 
-    println!("{}", style("staging changes...").magenta());
+    info("staging changes...");
     match args.add {
         Some(toadd) => match stage(&reporoot, &toadd, &dryrun) {
             _ => (),
@@ -60,18 +51,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             _ => (),
         },
     }
+    success("done");
 
-    println!("{}", style("\ncommitting...").magenta());
+    info("\ncommitting...");
     commit(&reporoot, &message, &dryrun)?;
+    success("done");
 
-    println!("{}", style("\npushing...").magenta());
+    info("\npushing...");
     push(&reporoot, Some("main"), &dryrun)?;
+    success("done");
 
     if dryrun {
-        println!("\ndry run complete")
+        info("\ndry run complete")
     }
 
-    println!("\n😼");
+    info(&format!("{}", Emoji("\n😼", "\n:3")));
     Ok(())
 }
 
@@ -108,29 +102,21 @@ fn getrootdir() -> Result<PathBuf, std::io::Error> {
     }
 }
 
-fn printcommand(command: &Vec<&str>) {
-    println!("  {}", style(command.join(" ")).cyan());
-}
+fn getcleanroot(reporoot: &PathBuf) -> Result<String, Box<dyn std::error::Error>> {
+    let homediropt = my_home()?;
 
-fn printcommandoutput(output: Output) {
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let trimmed = stdout.trim();
-    if !trimmed.is_empty() {
-        println!("    {}", style(trimmed).green());
-    }
-}
+    let cleanroot = if let Some(homedir) = homediropt {
+        if reporoot.starts_with(&homedir) {
+            let relpath = reporoot.strip_prefix(&homedir)?;
+            format!("~/{}", relpath.display())
+        } else {
+            reporoot.to_string_lossy().into_owned()
+        }
+    } else {
+        reporoot.to_string_lossy().into_owned()
+    };
 
-fn printerror(error: &str) {
-    let term = Term::stderr();
-    term.write_line(&format!("{}", style("error: ").red()))
-        .unwrap();
-    term.write_line(&format!("  {}", style(error).red()))
-        .unwrap();
-    term.write_line(&format!(
-        "{}",
-        style("run `meow -h` for detailed help").red()
-    ))
-    .unwrap();
+    Ok(cleanroot)
 }
 
 fn createcommand<'a>(args: &[&'a str]) -> Vec<&'a str> {
@@ -164,7 +150,7 @@ fn runcommand(repopath: &Path, args: &[&str]) -> Result<Output, String> {
                     .unwrap_or("failed to read stderr (non-utf8)")
                     .trim();
                 Err(format!(
-                    "command `{:?}` executed in `{}` failed with: {}",
+                    "command `{}` executed in `{}` failed with: {}",
                     style(commandparts.join(" ")).yellow(),
                     repopath.display(),
                     style(stderr).red()
@@ -172,10 +158,10 @@ fn runcommand(repopath: &Path, args: &[&str]) -> Result<Output, String> {
             }
         }
         Err(e) => Err(format!(
-            "failed to execute command `{:?}` in directory `{}`: {}",
-            commandparts,
+            "failed to execute command `{}` in directory `{}`: {}",
+            style(commandparts.join(" ")).yellow(),
             repopath.display(),
-            e
+            style(e.to_string()).red()
         )),
     }
 }
@@ -194,7 +180,7 @@ fn stageall(repopath: &Path) -> Result<(), String> {
 
 fn stage(repopath: &Path, files: &[String], dryrun: &bool) -> Result<(), String> {
     let mut args = vec!["add".to_owned()];
-    args.extend(files.iter().map(|s| s.to_owned()).collect::<Vec<String>>());
+    args.extend(files.iter().cloned());
 
     if !dryrun.to_owned() {
         match runcommand(
@@ -205,7 +191,7 @@ fn stage(repopath: &Path, files: &[String], dryrun: &bool) -> Result<(), String>
                 printcommandoutput(o);
                 println!("{}", style("staged files").magenta());
             }
-            Err(e) => panic!("could not stage files {}: {}", files.join(""), e),
+            Err(e) => panic!("could not stage files {:?}: {}", files, e),
         }
     } else {
         printcommand(&args.iter().map(|a| a.as_str()).collect::<Vec<&str>>())
