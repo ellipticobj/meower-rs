@@ -168,7 +168,7 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
 
     debug("printing custom commit output", verbose);
     info(&format!(
-        "    {}, {} files changed{}",
+        "    {}, {}{}",
         branchinfo.trim(),
         fileschangedcount,
         if let Some(mode) = modeline {
