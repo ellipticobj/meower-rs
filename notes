@@ -1,7 +1,7 @@
 commit message:
 [branch xxhashx] <msg here>
  X files changed, XX insertions(+), XX deletions(-)
- create mode XXXXXX filename
+ create/delete mode XXXXXX filename
 
 insertions/deletions might not exist
-create mode appears when file is made
+create/delete mode appears when file is made/deleted
