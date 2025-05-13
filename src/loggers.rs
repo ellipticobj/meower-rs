@@ -54,8 +54,8 @@ fn parsecount(s: &str) -> Result<i32, ParseIntError> {
 }
 
 pub fn printcommitoutput(output: Output, verbose: &u8) {
-    let stdout_raw = output.stdout.clone();
-    let stdout = String::from_utf8_lossy(&stdout_raw);
+    let rawstdout = output.stdout.clone();
+    let stdout = String::from_utf8_lossy(&rawstdout);
     let lines = stdout.lines();
 
     let mut fileschangedline: Option<&str> = None;
@@ -69,64 +69,23 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
         }
     }
 
+    if fileschangedline.is_none() || modeline.is_none() {
+        debug(
+            &format!("raw stdout when required lines not found: {}", stdout),
+            verbose,
+        );
+        debug(
+            &format!("fileschangedline: {:?}", fileschangedline),
+            verbose,
+        );
+        debug("falling back to printcommandoutput()", verbose);
+        printcommandoutput(output);
+        return;
+    }
+
     if let (Some(fileschangedline), Some(modeline)) = (fileschangedline, modeline) {
         let parts1 = fileschangedline.split(", ").collect::<Vec<&str>>();
-        if parts1.len() > 1 {
-            let branchinfo = parts1[0];
-            let fileschangedpart = parts1[1];
-            let fileschangedcount = fileschangedpart
-                .split_whitespace()
-                .next()
-                .unwrap_or("0")
-                .parse::<i32>()
-                .unwrap_or(0);
-
-            let insertionspart = if parts1.len() > 2 {
-                parts1[2]
-            } else {
-                "0 insertions(+)"
-            };
-            let deletionspart = if parts1.len() > 3 {
-                parts1[3]
-            } else {
-                "0 deletions(-)"
-            };
-            let insertions = parsecount(insertionspart);
-            let deletions = parsecount(deletionspart);
-
-            match insertions {
-                Ok(insertions) => match deletions {
-                    Ok(deletions) => {
-                        info(&format!(
-                            "{} {} , {}",
-                            branchinfo, fileschangedpart, modeline,
-                        ));
-                        info(&format!(
-                            "{} insertions, {} deletions",
-                            insertions, deletions
-                        ));
-                    }
-                    Err(e) => {
-                        debug(
-                            &format!("raw stdout on deletion parse error: {}", stdout),
-                            verbose,
-                        );
-                        debug(&format!("error: {}", e), verbose);
-                        debug("falling back to printcommandoutput()", verbose);
-                        printcommandoutput(output);
-                    }
-                },
-                Err(e) => {
-                    debug(
-                        &format!("raw stdout on insertion parse error: {}", stdout),
-                        verbose,
-                    );
-                    debug(&format!("error: {}", e), verbose);
-                    debug("falling back to printcommandoutput()", verbose);
-                    printcommandoutput(output);
-                }
-            }
-        } else {
+        if parts1.len() <= 1 {
             debug(
                 &format!("raw stdout on incomplete files changed line: {}", stdout),
                 verbose,
@@ -137,13 +96,64 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
             );
             debug("falling back to printcommandoutput()", verbose);
             printcommandoutput(output);
+            return;
         }
-    } else {
-        debug(
-            &format!("raw stdout when required lines not found: {}", stdout),
-            verbose,
-        );
-        println!("{}", stdout);
+
+        let branchinfo = parts1[0];
+        let fileschangedpart = parts1[1];
+        let fileschangedcount = fileschangedpart
+            .split_whitespace()
+            .next()
+            .unwrap_or("0")
+            .parse::<i32>()
+            .unwrap_or(0);
+
+        let insertionspart = if parts1.len() > 2 {
+            parts1[2]
+        } else {
+            "0 insertions(+)"
+        };
+        let deletionspart = if parts1.len() > 3 {
+            parts1[3]
+        } else {
+            "0 deletions(-)"
+        };
+        let insertions_result = parsecount(insertionspart);
+        let deletions_result = parsecount(deletionspart);
+
+        if let Err(e) = insertions_result {
+            debug(
+                &format!("raw stdout on insertion parse error: {}", stdout),
+                verbose,
+            );
+            debug(&format!("error: {}", e), verbose);
+            debug("falling back to printcommandoutput()", verbose);
+            printcommandoutput(output);
+            return;
+        }
+
+        if let Err(e) = deletions_result {
+            debug(
+                &format!("raw stdout on deletion parse error: {}", stdout),
+                verbose,
+            );
+            debug(&format!("error: {}", e), verbose);
+            debug("falling back to printcommandoutput()", verbose);
+            printcommandoutput(output);
+            return;
+        }
+
+        let insertions = insertions_result.unwrap();
+        let deletions = deletions_result.unwrap();
+
+        info(&format!(
+            "{} {} , {}",
+            branchinfo, fileschangedpart, modeline,
+        ));
+        info(&format!(
+            "{} insertions, {} deletions",
+            insertions, deletions
+        ));
     }
 }
 
