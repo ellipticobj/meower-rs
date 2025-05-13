@@ -25,6 +25,7 @@ make sure ~/.cargo is on your path!
 # in progress
 
 - [ ] custom clap error output
+- [ ] custom commit command output
 - [ ] add progress bars + spinners
 - [ ] add flags for running git commands
 - [x] proper output
