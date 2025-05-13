@@ -1,3 +1,7 @@
 commit message:
 [branch xxhashx] <msg here>
-     X files changed, XX insertions(+), XX deletions(-)
+ X files changed, XX insertions(+), XX deletions(-)
+ create mode XXXXXX filename
+
+insertions/deletions might not exist
+create mode appears when file is made
