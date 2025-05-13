@@ -62,14 +62,20 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
     let mut modeline: Option<&str> = None;
 
     for line in lines {
-        if line.contains("files changed") {
+        if line.contains("files changed")
+            || line.contains("file changed")
+            || line.contains("insertions")
+            || line.contains("insertion")
+            || line.contains("deletions")
+            || line.contains("deletion")
+        {
             fileschangedline = Some(line);
         } else if line.contains("create mode") || line.contains("delete mode") {
             modeline = Some(line);
         }
     }
 
-    if fileschangedline.is_none() || modeline.is_none() {
+    if fileschangedline.is_none() {
         debug(
             &format!("raw stdout when required lines not found: {}", stdout),
             verbose,
@@ -78,6 +84,7 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
             &format!("fileschangedline: {:?}", fileschangedline),
             verbose,
         );
+        debug(&format!("modeline: {:?}", modeline), verbose);
         debug("falling back to printcommandoutput()", verbose);
         printcommandoutput(output);
         return;
