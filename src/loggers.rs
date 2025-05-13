@@ -44,13 +44,12 @@ pub fn printcommandoutput(output: Output) {
 
 fn parsecount(s: &str) -> Result<i32, ParseIntError> {
     let trimmed = s.trim();
-    let countstr = if trimmed.ends_with('+') || trimmed.ends_with('-') {
-        &trimmed[..trimmed.len() - 1]
+    let parts = trimmed.split_whitespace().collect::<Vec<&str>>();
+    if let Some(countstr) = parts.first() {
+        countstr.parse::<i32>()
     } else {
-        trimmed
-    };
-    //parse
-    countstr.parse::<i32>()
+        Ok(0)
+    }
 }
 
 pub fn printcommitoutput(output: Output, verbose: &u8) {
@@ -141,7 +140,6 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
     let deletionsres = parsecount(deletionspart);
 
     debug("checking errors", verbose);
-
     if let Err(e) = insertionsres {
         debug(
             &format!("raw stdout on insertion parse error: {}", stdout),
