@@ -290,7 +290,8 @@ fn commit(repopath: &Path, message: &str, dryrun: &bool, verbose: &u8) -> Result
 
     match runcommand(repopath, args) {
         Ok(o) => {
-            printcommandoutput(o);
+            // printcommandoutput(o);
+            printcommitoutput(o, verbose);
             Ok(())
         }
         Err(e) => Err(format!("could not commit files: {}", e)),
