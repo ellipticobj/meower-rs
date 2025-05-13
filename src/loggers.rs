@@ -1,7 +1,7 @@
 use crate::args::Args;
 use clap::CommandFactory;
 use console::{Term, style};
-use std::process::Output;
+use std::{num::ParseIntError, process::Output};
 
 pub fn printhelp() {
     let mut cmd = Args::command();
@@ -39,6 +39,103 @@ pub fn printcommandoutput(output: Output) {
         for line in stdout.lines() {
             info(&format!("    {}", line));
         }
+    }
+}
+
+fn parsecount(s: &str) -> Result<i32, ParseIntError> {
+    let trimmed = s.trim();
+    let countstr = if trimmed.ends_with('+') || trimmed.ends_with('-') {
+        &trimmed[..trimmed.len() - 1]
+    } else {
+        trimmed
+    };
+    //parse
+    countstr.parse::<i32>()
+}
+
+pub fn printcommitoutput(output: Output, verbose: &u8) {
+    let stdout_raw = output.stdout.clone();
+    let stdout = String::from_utf8_lossy(&stdout_raw);
+    let lines = stdout.lines();
+
+    let mut fileschangedline: Option<&str> = None;
+    let mut modeline: Option<&str> = None;
+
+    for line in lines {
+        if line.contains("files changed") {
+            fileschangedline = Some(line);
+        } else if line.contains("create mode") || line.contains("delete mode") {
+            modeline = Some(line);
+        }
+    }
+
+    if let (Some(fileschangedline), Some(modeline)) = (fileschangedline, modeline) {
+        let parts1 = fileschangedline.split(", ").collect::<Vec<&str>>();
+        if parts1.len() > 1 {
+            let branchinfo = parts1[0];
+            let fileschangedpart = parts1[1];
+            let fileschangedcount = fileschangedpart
+                .split_whitespace()
+                .next()
+                .unwrap_or("0")
+                .parse::<i32>()
+                .unwrap_or(0);
+
+            let insertionspart = if parts1.len() > 2 {
+                parts1[2]
+            } else {
+                "0 insertions(+)"
+            };
+            let deletionspart = if parts1.len() > 3 {
+                parts1[3]
+            } else {
+                "0 deletions(-)"
+            };
+            let insertions = parsecount(insertionspart);
+            let deletions = parsecount(deletionspart);
+
+            match insertions {
+                Ok(insertions) => match deletions {
+                    Ok(deletions) => {
+                        println!("{} {} , {}", branchinfo, fileschangedpart, modeline);
+                        println!("{} insertions, {} deletions", insertions, deletions);
+                    }
+                    Err(e) => {
+                        error(&format!("error parsing deletions: {}", e));
+                        debug(
+                            &format!("raw stdout on deletion parse error: {}", stdout),
+                            verbose,
+                        );
+                        println!("{}", stdout);
+                    }
+                },
+                Err(e) => {
+                    error(&format!("error parsing insertions: {}", e));
+                    debug(
+                        &format!("raw stdout on insertion parse error: {}", stdout),
+                        verbose,
+                    );
+                    println!("{}", stdout);
+                }
+            }
+        } else {
+            error(&format!(
+                "incomplete files changed line: {}",
+                fileschangedline
+            ));
+            debug(
+                &format!("raw stdout on incomplete files changed line: {}", stdout),
+                verbose,
+            );
+            println!("{}", stdout);
+        }
+    } else {
+        error("could not find the required lines in the output.");
+        debug(
+            &format!("raw stdout when required lines not found: {}", stdout),
+            verbose,
+        );
+        println!("{}", stdout);
     }
 }
 
