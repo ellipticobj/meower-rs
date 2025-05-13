@@ -16,6 +16,7 @@ const VERSION: &str = "0.0.1-rs";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
+    let verbose = args.verbose;
 
     if args.meow {
         info("meow meow :3");
@@ -25,14 +26,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     important("\nmeow");
     important(&format!("version {}", VERSION));
 
+    debug("checking if help flag was specified", &verbose);
     if args.help {
         println!();
         printhelp();
+        debug("help printed, exiting", &verbose);
         return Ok(());
     }
 
+    debug("getting repository root", &verbose);
     let reporoot = getrootdir()?;
     let root = getcleanroot(&reporoot)?;
+    debug(&format!("root is {}", root), &verbose);
 
     println!(
         "{} {}\n",
@@ -40,10 +45,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         style(root).magenta()
     );
 
+    debug("checking if version flag was specified", &verbose);
     if args.version {
         return Ok(());
     }
 
+    debug("initializing variables from flags", &verbose);
     let dryrun = args.dryrun;
     let force = args.force;
     let forceforce = args.forceforce;
@@ -60,15 +67,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     info("staging changes...");
+    debug("checking if files were specified to be staged", &verbose);
     match args.add {
-        Some(toadd) => match stage(&reporoot, &toadd, &dryrun) {
+        Some(toadd) => match stage(&reporoot, &toadd, &dryrun, &verbose) {
             Err(e) => {
                 error(&e);
                 exit(1);
             }
             _ => (),
         },
-        None => match stageall(&reporoot) {
+        None => match stageall(&reporoot, &dryrun, &verbose) {
             Err(e) => {
                 error(&e);
                 exit(1);
@@ -79,14 +87,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     success("done");
 
     info("\ncommitting...");
-    commit(&reporoot, &message, &dryrun)?;
+    commit(&reporoot, &message, &dryrun, &verbose)?;
     success("done");
 
     info("\npushing...");
     if let Some(upstream) = args.upstream {
-        push(&reporoot, Some(&upstream), &dryrun, &force, &forceforce)?;
+        push(
+            &reporoot,
+            Some(&upstream),
+            &dryrun,
+            &force,
+            &forceforce,
+            &verbose,
+        )?;
     } else {
-        push(&reporoot, None, &dryrun, &force, &forceforce)?;
+        push(&reporoot, None, &dryrun, &force, &forceforce, &verbose)?;
     }
     success("done");
 
@@ -195,8 +210,16 @@ fn runcommand(repopath: &Path, args: &[&str]) -> Result<Output, String> {
     }
 }
 
-fn stageall(repopath: &Path) -> Result<(), String> {
+fn stageall(repopath: &Path, dryrun: &bool, verbose: &bool) -> Result<(), String> {
+    debug("no files were specified, staging all", verbose);
     let args = &["add", "."];
+
+    if *dryrun {
+        debug("debug was specified, not staging", verbose);
+        printcommand(&args.to_vec());
+        return Ok(());
+    }
+
     match runcommand(repopath, args) {
         Ok(o) => {
             printcommandoutput(o);
@@ -206,53 +229,56 @@ fn stageall(repopath: &Path) -> Result<(), String> {
     }
 }
 
-fn stage(repopath: &Path, files: &[String], dryrun: &bool) -> Result<(), String> {
+fn stage(repopath: &Path, files: &[String], dryrun: &bool, verbose: &bool) -> Result<(), String> {
+    debug(&format!("files {:#?} were specified", files), verbose);
     let mut args = vec!["add".to_owned()];
     args.extend(files.iter().cloned());
 
-    if !*dryrun {
-        match runcommand(
-            repopath,
-            &args.iter().map(|a| a.as_str()).collect::<Vec<&str>>(),
-        ) {
-            Ok(o) => {
-                printcommandoutput(o);
-                Ok(())
-            }
-            Err(e) => {
-                if e.contains("did not match any files") {
-                    Err(format!(
-                        "    could not stage files: \n      `{}`\n    files not found",
-                        files.join(", ")
-                    ))
-                } else {
-                    Err(format!(
-                        "    could not stage files: \n      `{}`",
-                        files.join(", ")
-                    ))
-                }
+    if *dryrun {
+        debug("debug was specified, not staging", verbose);
+        printcommand(&args.iter().map(|a| a.as_str()).collect::<Vec<&str>>());
+        return Ok(());
+    }
+
+    match runcommand(
+        repopath,
+        &args.iter().map(|a| a.as_str()).collect::<Vec<&str>>(),
+    ) {
+        Ok(o) => {
+            printcommandoutput(o);
+            Ok(())
+        }
+        Err(e) => {
+            if e.contains("did not match any files") {
+                Err(format!(
+                    "    could not stage files: \n      `{}`\n    files not found",
+                    files.join(", ")
+                ))
+            } else {
+                Err(format!(
+                    "    could not stage files: \n      `{}`",
+                    files.join(", ")
+                ))
             }
         }
-    } else {
-        printcommand(&args.iter().map(|a| a.as_str()).collect::<Vec<&str>>());
-        Ok(())
     }
 }
 
-fn commit(repopath: &Path, message: &str, dryrun: &bool) -> Result<(), String> {
+fn commit(repopath: &Path, message: &str, dryrun: &bool, verbose: &bool) -> Result<(), String> {
     let args = &["commit", "-m", message];
 
     if *dryrun {
+        debug("dry run was specified, not committing", verbose);
         printcommand(&args.to_vec());
-        Ok(())
-    } else {
-        match runcommand(repopath, args) {
-            Ok(o) => {
-                printcommandoutput(o);
-                Ok(())
-            }
-            Err(e) => Err(format!("could not commit files: {}", e)),
+        return Ok(());
+    }
+
+    match runcommand(repopath, args) {
+        Ok(o) => {
+            printcommandoutput(o);
+            Ok(())
         }
+        Err(e) => Err(format!("could not commit files: {}", e)),
     }
 }
 
@@ -262,19 +288,24 @@ fn push(
     dryrun: &bool,
     force: &bool,
     forceforce: &bool,
+    verbose: &bool,
 ) -> Result<(), String> {
     let mut args = vec!["push"];
     if let Some(upstreamval) = upstream {
+        debug(&format!("upstream {} was specified", upstreamval), verbose);
         args.extend(["--set-upstream", "origin", upstreamval]);
     }
     if *force {
+        debug("force was specified, using force-with-lease", verbose);
         args.extend(["--force-with-lease"])
     }
     if *forceforce {
+        debug("force force was specified, using force", verbose);
         args.extend(["--force"])
     }
 
     if !*dryrun {
+        debug("dry run was not specified, pushing", verbose);
         match runcommand(repopath, &args) {
             Ok(o) => {
                 printcommandoutput(o);
@@ -288,6 +319,7 @@ fn push(
             Err(e) => Err(format!("could not push to remote: {}", style(e).red())),
         }
     } else {
+        debug("dry run was specified, not pushing", verbose);
         printcommand(&args);
         Ok(())
     }

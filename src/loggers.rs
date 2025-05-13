@@ -68,8 +68,10 @@ pub fn info(text: &str) {
     println!("{}", style(text).magenta());
 }
 
-pub fn debug(text: &str) {
-    println!("{}", style(text).blue());
+pub fn debug(text: &str, debug: &bool) {
+    if *debug {
+        println!("[DEBUG] {}", style(text).blue());
+    }
 }
 
 pub fn success(text: &str) {

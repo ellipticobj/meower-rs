@@ -47,4 +47,7 @@ pub struct Args {
 
     #[arg(long = "force-without-lease", short = 'F', help = "adds --force")]
     pub forceforce: bool,
+
+    #[arg(long = "verbose", short = 'v', help = "adds debug prints")]
+    pub verbose: bool,
 }
