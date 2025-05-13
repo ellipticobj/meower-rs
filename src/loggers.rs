@@ -97,40 +97,48 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
             match insertions {
                 Ok(insertions) => match deletions {
                     Ok(deletions) => {
-                        println!("{} {} , {}", branchinfo, fileschangedpart, modeline);
-                        println!("{} insertions, {} deletions", insertions, deletions);
+                        info(&format!(
+                            "{} {} , {}",
+                            branchinfo, fileschangedpart, modeline,
+                        ));
+                        info(&format!(
+                            "{} insertions, {} deletions",
+                            insertions, deletions
+                        ));
                     }
                     Err(e) => {
-                        error(&format!("error parsing deletions: {}", e));
                         debug(
                             &format!("raw stdout on deletion parse error: {}", stdout),
                             verbose,
                         );
-                        println!("{}", stdout);
+                        debug(&format!("error: {}", e), verbose);
+                        debug("falling back to printcommandoutput()", verbose);
+                        printcommandoutput(output);
                     }
                 },
                 Err(e) => {
-                    error(&format!("error parsing insertions: {}", e));
                     debug(
                         &format!("raw stdout on insertion parse error: {}", stdout),
                         verbose,
                     );
-                    println!("{}", stdout);
+                    debug(&format!("error: {}", e), verbose);
+                    debug("falling back to printcommandoutput()", verbose);
+                    printcommandoutput(output);
                 }
             }
         } else {
-            error(&format!(
-                "incomplete files changed line: {}",
-                fileschangedline
-            ));
             debug(
                 &format!("raw stdout on incomplete files changed line: {}", stdout),
                 verbose,
             );
-            println!("{}", stdout);
+            debug(
+                &format!("files changed line: {}", fileschangedline),
+                verbose,
+            );
+            debug("falling back to printcommandoutput()", verbose);
+            printcommandoutput(output);
         }
     } else {
-        error("could not find the required lines in the output.");
         debug(
             &format!("raw stdout when required lines not found: {}", stdout),
             verbose,
