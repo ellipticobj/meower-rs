@@ -58,8 +58,19 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
     let stdout = String::from_utf8_lossy(&rawstdout);
     let mut lines = stdout.lines();
 
-    // Capture the first line (branch and hash)
-    let first_line = lines.next().map(|s| s.trim());
+    let firstline = lines.next().map(|s| s.trim()).unwrap_or("");
+    let firstlineparts: Vec<&str> = firstline.split(' ').collect();
+
+    let branchhashinfo = if firstlineparts.len() >= 2 {
+        let branchpart = firstlineparts[0]
+            .trim_start_matches('[')
+            .trim_end_matches(']');
+        let hashpart = firstlineparts[1].trim();
+        format!("[branch: {}, hash: {}]", branchpart, hashpart)
+    } else {
+        String::new()
+    };
+
     let mut fileschangedline: Option<&str> = None;
     let mut modeline: Option<&str> = None;
 
@@ -94,7 +105,7 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
         return;
     }
 
-    debug("splitting", verbose);
+    debug("splitting files changed line", verbose);
     let Some(fileschangedline) = fileschangedline else {
         debug(
             "fileschangedline was None unexpectedly (should have been caught by prior check). falling back.",
@@ -106,37 +117,25 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
         return;
     };
 
-    let parts1 = fileschangedline.split(", ").collect::<Vec<&str>>();
-    if parts1.len() <= 1 {
-        debug(
-            &format!("raw stdout on incomplete fileschangedline: {}", stdout),
-            verbose,
-        );
-        debug(&format!("fileschangedline: {}", fileschangedline), verbose);
-        debug("falling back to printcommandoutput()", verbose);
-        printcommandoutput(output);
-        return;
+    let partsfileschanged: Vec<&str> = fileschangedline.split(", ").collect();
+    let mut fileschangedcount = "0";
+
+    if let Some(fileschangedpart) = partsfileschanged.first() {
+        let parts = fileschangedpart.split_whitespace().collect::<Vec<&str>>();
+        if parts.len() >= 1 {
+            fileschangedcount = parts[0];
+        }
     }
 
-    debug("initializing parts", verbose);
-    let fileschangedpart = parts1[0]; // The first part now contains the "X files changed" info
-    let fileschangedcount = fileschangedpart
-        .split_whitespace()
-        .next()
-        .unwrap_or("0")
-        .parse::<i32>()
-        .unwrap_or(0);
+    let insertionspart = partsfileschanged
+        .iter()
+        .find(|&s| s.contains("insertion"))
+        .unwrap_or(&"0 insertions(+/-)");
+    let deletionspart = partsfileschanged
+        .iter()
+        .find(|&s| s.contains("deletion"))
+        .unwrap_or(&"0 deletions(+/-)");
 
-    let insertionspart = if parts1.len() > 1 {
-        parts1[1]
-    } else {
-        "0 insertions(+)"
-    };
-    let deletionspart = if parts1.len() > 2 {
-        parts1[2]
-    } else {
-        "0 deletions(-)"
-    };
     let insertionsres = parsecount(insertionspart);
     let deletionsres = parsecount(deletionspart);
 
@@ -164,19 +163,16 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
     }
 
     debug("getting insertions and deletions", verbose);
-    let insertions = insertionsres.unwrap();
-    let deletions = deletionsres.unwrap();
+    let insertions = insertionsres.unwrap_or(0);
+    let deletions = deletionsres.unwrap_or(0);
 
     debug("printing custom commit output", verbose);
-    if let Some(firstline) = first_line {
-        info(&format!("    {}", firstline));
-    }
     info(&format!(
-        "    {}, {}{}",
-        fileschangedpart.trim(),
+        "    {} {} file(s) changed{}",
+        branchhashinfo,
         fileschangedcount,
-        if let Some(mode) = modeline {
-            format!(", {}", mode.trim())
+        if let Some(modeline) = modeline {
+            format!(", {}", modeline.trim())
         } else {
             String::new()
         }
@@ -185,6 +181,18 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
         "    {} insertions, {} deletions",
         insertions, deletions
     ));
+
+    if let Some(modeline) = modeline {
+        let modeparts = modeline.split_whitespace().collect::<Vec<&str>>();
+        if modeparts.len() >= 3 {
+            info(&format!(
+                "    {} {} {}",
+                modeparts[0],
+                modeparts[1],
+                modeparts[2..].join(" ")
+            ));
+        }
+    }
 }
 
 pub fn _fatalerror(error: &str) {
