@@ -56,8 +56,10 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
     debug("parsing commit command output", verbose);
     let rawstdout = output.stdout.clone();
     let stdout = String::from_utf8_lossy(&rawstdout);
-    let lines = stdout.lines();
+    let mut lines = stdout.lines();
 
+    // Capture the first line (branch and hash)
+    let first_line = lines.next().map(|s| s.trim());
     let mut fileschangedline: Option<&str> = None;
     let mut modeline: Option<&str> = None;
 
@@ -117,8 +119,7 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
     }
 
     debug("initializing parts", verbose);
-    let branchinfo = parts1[0];
-    let fileschangedpart = parts1[1];
+    let fileschangedpart = parts1[0]; // The first part now contains the "X files changed" info
     let fileschangedcount = fileschangedpart
         .split_whitespace()
         .next()
@@ -126,13 +127,13 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
         .parse::<i32>()
         .unwrap_or(0);
 
-    let insertionspart = if parts1.len() > 2 {
-        parts1[2]
+    let insertionspart = if parts1.len() > 1 {
+        parts1[1]
     } else {
         "0 insertions(+)"
     };
-    let deletionspart = if parts1.len() > 3 {
-        parts1[3]
+    let deletionspart = if parts1.len() > 2 {
+        parts1[2]
     } else {
         "0 deletions(-)"
     };
@@ -167,9 +168,12 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
     let deletions = deletionsres.unwrap();
 
     debug("printing custom commit output", verbose);
+    if let Some(firstline) = first_line {
+        info(&format!("    {}", firstline));
+    }
     info(&format!(
         "    {}, {}{}",
-        branchinfo.trim(),
+        fileschangedpart.trim(),
         fileschangedcount,
         if let Some(mode) = modeline {
             format!(", {}", mode.trim())
