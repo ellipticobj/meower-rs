@@ -168,7 +168,7 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
 
     debug("printing custom commit output", verbose);
     info(&format!(
-        "{} {}, {} files changed{}",
+        "    {} {}, {} files changed{}",
         branchinfo,
         fileschangedpart,
         fileschangedcount,
@@ -179,7 +179,7 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
         }
     ));
     info(&format!(
-        "{} insertions, {} deletions",
+        "    {} insertions, {} deletions",
         insertions, deletions
     ));
 }
