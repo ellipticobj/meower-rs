@@ -54,6 +54,7 @@ fn parsecount(s: &str) -> Result<i32, ParseIntError> {
 }
 
 pub fn printcommitoutput(output: Output, verbose: &u8) {
+    debug("parsing commit command output", verbose);
     let rawstdout = output.stdout.clone();
     let stdout = String::from_utf8_lossy(&rawstdout);
     let lines = stdout.lines();
@@ -61,6 +62,7 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
     let mut fileschangedline: Option<&str> = None;
     let mut modeline: Option<&str> = None;
 
+    debug("searching output lines", verbose);
     for line in lines {
         if line.contains("files changed")
             || line.contains("file changed")
@@ -74,6 +76,7 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
             modeline = Some(line);
         }
     }
+    debug("done", verbose);
 
     if fileschangedline.is_none() {
         debug(
@@ -125,10 +128,10 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
         } else {
             "0 deletions(-)"
         };
-        let insertions_result = parsecount(insertionspart);
-        let deletions_result = parsecount(deletionspart);
+        let insertionsres = parsecount(insertionspart);
+        let deletionsres = parsecount(deletionspart);
 
-        if let Err(e) = insertions_result {
+        if let Err(e) = insertionsres {
             debug(
                 &format!("raw stdout on insertion parse error: {}", stdout),
                 verbose,
@@ -139,7 +142,7 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
             return;
         }
 
-        if let Err(e) = deletions_result {
+        if let Err(e) = deletionsres {
             debug(
                 &format!("raw stdout on deletion parse error: {}", stdout),
                 verbose,
@@ -150,12 +153,13 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
             return;
         }
 
-        let insertions = insertions_result.unwrap();
-        let deletions = deletions_result.unwrap();
+        let insertions = insertionsres.unwrap();
+        let deletions = deletionsres.unwrap();
 
+        debug("printing custom commit output", verbose);
         info(&format!(
-            "{} {} , {}",
-            branchinfo, fileschangedpart, modeline,
+            "{} {}, {} files changed, {}",
+            branchinfo, fileschangedpart, fileschangedcount, modeline,
         ));
         info(&format!(
             "{} insertions, {} deletions",
