@@ -6,7 +6,6 @@ description = "a simple git wrapper. rust version of the original: https://githu
 readme = "README.md"
 repository = "https://github.com/ellipticobj/meower-rs"
 license = "GPL-3.0"
-license-file = "LICENSE"
 keywords = ["git", "git-wrapper", "meow", "meower", "tool"]
 categories = ["git", "command-line-tool"]
 

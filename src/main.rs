@@ -17,6 +17,7 @@ const VERSION: &str = "0.0.1-rs";
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let verbose = args.verbose;
+    let run = args.run;
     debug("initializing flags", &verbose);
     let dryrun = args.dryrun;
     let force = args.force;
@@ -27,7 +28,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     important("\nmeow");
-    important(&format!("version {}", VERSION));
+    important(&format!("version {}\n", VERSION));
+
+    if run {
+        debug("run flag was specified, hijacking pipeline", &verbose);
+        error("run is not implemented yet.");
+        return Ok(());
+    }
 
     debug("checking if help flag was specified", &verbose);
     if args.help {
@@ -53,14 +60,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let message = args.commitmessage;
-    // let message = match args.commitmessage {
-    //     Some(message) => message,
-    //     None => {
-    //         fatalerror("commit message not specified\n");
-    //         exit(1);
-    //     }
-    // };
+    // let message = args.commitmessage;
+    let message = match args.commitmessage {
+        Some(message) => message,
+        None => String::from(""),
+    };
 
     if dryrun {
         info("dry run\n");
@@ -87,14 +91,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     success("done");
 
     info("\ncommitting...");
-    commit(&reporoot, &message, &dryrun, &verbose)?;
+    match commit(&reporoot, &message, &dryrun, &verbose) {
+        Err(e) => {
+            error(&e);
+            exit(1);
+        }
+        _ => (),
+    }
     success("done");
 
     info("\npushing...");
     if let Some(upstream) = args.upstream {
-        push(&reporoot, Some(&upstream), &dryrun, &force, &verbose)?;
+        match push(&reporoot, Some(&upstream), &dryrun, &force, &verbose) {
+            Err(e) => {
+                error(&e);
+                exit(1)
+            }
+            _ => (),
+        }
     } else {
-        push(&reporoot, None, &dryrun, &force, &verbose)?;
+        match push(&reporoot, None, &dryrun, &force, &verbose) {
+            Err(e) => {
+                error(&e);
+                exit(1);
+            }
+            _ => (),
+        }
     }
     success("done");
 

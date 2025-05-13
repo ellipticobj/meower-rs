@@ -27,8 +27,12 @@ pub struct Args {
     )]
     pub dryrun: bool,
 
-    #[arg(name = "message", help = "commit message", required = true)]
-    pub commitmessage: String,
+    #[arg(
+        name = "message",
+        help = "commit message",
+        required_unless_present_any = &["run", "meow"]
+    )]
+    pub commitmessage: Option<String>,
 
     #[arg(long = "version", short = 'V', help = "print version")]
     pub version: bool,
@@ -39,10 +43,18 @@ pub struct Args {
     #[arg(long = "meow", hide(true))]
     pub meow: bool,
 
+    #[arg(long = "run", short = 'r', help = "run git commands", hide(true))]
+    pub run: bool,
+
     #[arg(long = "set-upstream", short = 'u', help = "sets upstream")]
     pub upstream: Option<String>,
 
-    #[arg(long = "force", short = 'f', help = "adds --force-with-lease", action = clap::ArgAction::Count)]
+    #[arg(
+        long = "force",
+        short = 'f',
+        help = "adds --force-with-lease",
+        action = clap::ArgAction::Count
+    )]
     pub force: u8,
 
     #[arg(

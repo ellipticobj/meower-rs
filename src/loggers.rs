@@ -42,7 +42,7 @@ pub fn printcommandoutput(output: Output) {
     }
 }
 
-pub fn fatalerror(error: &str) {
+pub fn _fatalerror(error: &str) {
     let term = Term::stderr();
     term.write_line(&format!("{}", style("error: ").red()))
         .unwrap();
