@@ -93,22 +93,21 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
         return;
     }
 
+    debug("splitting", verbose);
     if let (Some(fileschangedline), Some(modeline)) = (fileschangedline, modeline) {
         let parts1 = fileschangedline.split(", ").collect::<Vec<&str>>();
         if parts1.len() <= 1 {
             debug(
-                &format!("raw stdout on incomplete files changed line: {}", stdout),
+                &format!("raw stdout on incomplete fileschangedline: {}", stdout),
                 verbose,
             );
-            debug(
-                &format!("files changed line: {}", fileschangedline),
-                verbose,
-            );
+            debug(&format!("fileschangedline: {}", fileschangedline), verbose);
             debug("falling back to printcommandoutput()", verbose);
             printcommandoutput(output);
             return;
         }
 
+        debug("initializing parts", verbose);
         let branchinfo = parts1[0];
         let fileschangedpart = parts1[1];
         let fileschangedcount = fileschangedpart
@@ -130,6 +129,8 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
         };
         let insertionsres = parsecount(insertionspart);
         let deletionsres = parsecount(deletionspart);
+
+        debug("checking errors", verbose);
 
         if let Err(e) = insertionsres {
             debug(
@@ -153,6 +154,7 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
             return;
         }
 
+        debug("getting insertions and deletions", verbose);
         let insertions = insertionsres.unwrap();
         let deletions = deletionsres.unwrap();
 
