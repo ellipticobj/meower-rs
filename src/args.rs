@@ -27,8 +27,8 @@ pub struct Args {
     )]
     pub dryrun: bool,
 
-    #[arg(name = "message", help = "commit message")]
-    pub commitmessage: Option<String>,
+    #[arg(name = "message", help = "commit message", required = true)]
+    pub commitmessage: String,
 
     #[arg(long = "version", short = 'V', help = "print version")]
     pub version: bool,
@@ -42,12 +42,14 @@ pub struct Args {
     #[arg(long = "set-upstream", short = 'u', help = "sets upstream")]
     pub upstream: Option<String>,
 
-    #[arg(long = "force", short = 'f', help = "adds --force-with-lease")]
-    pub force: bool,
+    #[arg(long = "force", short = 'f', help = "adds --force-with-lease", action = clap::ArgAction::Count)]
+    pub force: u8,
 
-    #[arg(long = "force-without-lease", short = 'F', help = "adds --force")]
-    pub forceforce: bool,
-
-    #[arg(long = "verbose", short = 'v', help = "adds debug prints")]
-    pub verbose: bool,
+    #[arg(
+        long = "verbose",
+        short = 'v',
+        help = "verbose output",
+        action = clap::ArgAction::Count
+    )]
+    pub verbose: u8,
 }

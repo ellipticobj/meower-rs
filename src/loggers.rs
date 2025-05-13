@@ -68,8 +68,8 @@ pub fn info(text: &str) {
     println!("{}", style(text).magenta());
 }
 
-pub fn debug(text: &str, debug: &bool) {
-    if *debug {
+pub fn debug(text: &str, verbose: &u8) {
+    if verbose.to_owned() >= 1 {
         println!("[DEBUG] {}", style(text).blue());
     }
 }

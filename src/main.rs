@@ -17,6 +17,9 @@ const VERSION: &str = "0.0.1-rs";
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let verbose = args.verbose;
+    debug("initializing flags", &verbose);
+    let dryrun = args.dryrun;
+    let force = args.force;
 
     if args.meow {
         info("meow meow :3");
@@ -50,17 +53,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    debug("initializing variables from flags", &verbose);
-    let dryrun = args.dryrun;
-    let force = args.force;
-    let forceforce = args.forceforce;
-    let message = match args.commitmessage {
-        Some(message) => message,
-        None => {
-            fatalerror("commit message not specified\n");
-            exit(1);
-        }
-    };
+    let message = args.commitmessage;
+    // let message = match args.commitmessage {
+    //     Some(message) => message,
+    //     None => {
+    //         fatalerror("commit message not specified\n");
+    //         exit(1);
+    //     }
+    // };
 
     if dryrun {
         info("dry run\n");
@@ -92,16 +92,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info("\npushing...");
     if let Some(upstream) = args.upstream {
-        push(
-            &reporoot,
-            Some(&upstream),
-            &dryrun,
-            &force,
-            &forceforce,
-            &verbose,
-        )?;
+        push(&reporoot, Some(&upstream), &dryrun, &force, &verbose)?;
     } else {
-        push(&reporoot, None, &dryrun, &force, &forceforce, &verbose)?;
+        push(&reporoot, None, &dryrun, &force, &verbose)?;
     }
     success("done");
 
@@ -210,7 +203,7 @@ fn runcommand(repopath: &Path, args: &[&str]) -> Result<Output, String> {
     }
 }
 
-fn stageall(repopath: &Path, dryrun: &bool, verbose: &bool) -> Result<(), String> {
+fn stageall(repopath: &Path, dryrun: &bool, verbose: &u8) -> Result<(), String> {
     debug("no files were specified, staging all", verbose);
     let args = &["add", "."];
 
@@ -229,7 +222,7 @@ fn stageall(repopath: &Path, dryrun: &bool, verbose: &bool) -> Result<(), String
     }
 }
 
-fn stage(repopath: &Path, files: &[String], dryrun: &bool, verbose: &bool) -> Result<(), String> {
+fn stage(repopath: &Path, files: &[String], dryrun: &bool, verbose: &u8) -> Result<(), String> {
     debug(&format!("files {:#?} were specified", files), verbose);
     let mut args = vec!["add".to_owned()];
     args.extend(files.iter().cloned());
@@ -264,7 +257,7 @@ fn stage(repopath: &Path, files: &[String], dryrun: &bool, verbose: &bool) -> Re
     }
 }
 
-fn commit(repopath: &Path, message: &str, dryrun: &bool, verbose: &bool) -> Result<(), String> {
+fn commit(repopath: &Path, message: &str, dryrun: &bool, verbose: &u8) -> Result<(), String> {
     let args = &["commit", "-m", message];
 
     if *dryrun {
@@ -286,41 +279,40 @@ fn push(
     repopath: &Path,
     upstream: Option<&str>,
     dryrun: &bool,
-    force: &bool,
-    forceforce: &bool,
-    verbose: &bool,
+    force: &u8,
+    verbose: &u8,
 ) -> Result<(), String> {
     let mut args = vec!["push"];
     if let Some(upstreamval) = upstream {
         debug(&format!("upstream {} was specified", upstreamval), verbose);
         args.extend(["--set-upstream", "origin", upstreamval]);
     }
-    if *force {
+    if force.to_owned() == 1 {
         debug("force was specified, using force-with-lease", verbose);
         args.extend(["--force-with-lease"])
     }
-    if *forceforce {
-        debug("force force was specified, using force", verbose);
+    if force.to_owned() >= 2 {
+        debug("force was specified twice, using force", verbose);
         args.extend(["--force"])
     }
 
-    if !*dryrun {
-        debug("dry run was not specified, pushing", verbose);
-        match runcommand(repopath, &args) {
-            Ok(o) => {
-                printcommandoutput(o);
-                if let Some(branch) = upstream {
-                    success(&format!("  pushed to remote {}", branch));
-                } else {
-                    success("  pushed to remote");
-                }
-                Ok(())
-            }
-            Err(e) => Err(format!("could not push to remote: {}", style(e).red())),
-        }
-    } else {
+    if *dryrun {
         debug("dry run was specified, not pushing", verbose);
         printcommand(&args);
-        Ok(())
+        return Ok(());
+    }
+
+    debug("dry run was not specified, pushing", verbose);
+    match runcommand(repopath, &args) {
+        Ok(o) => {
+            printcommandoutput(o);
+            if let Some(branch) = upstream {
+                success(&format!("  pushed to remote {}", branch));
+            } else {
+                success("  pushed to remote");
+            }
+            Ok(())
+        }
+        Err(e) => Err(format!("could not push to remote: {}", style(e).red())),
     }
 }
