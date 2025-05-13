@@ -105,20 +105,6 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
         return;
     };
 
-    let Some(modeline) = modeline else {
-        debug(
-            "modeline was None unexpectedly. fileschangedline was present. Falling back.",
-            verbose,
-        );
-        debug(
-            &format!("fileschangedline (value): {}", fileschangedline),
-            verbose,
-        );
-        debug(&format!("raw stdout: {}", stdout), verbose);
-        printcommandoutput(output);
-        return;
-    };
-
     let parts1 = fileschangedline.split(", ").collect::<Vec<&str>>();
     if parts1.len() <= 1 {
         debug(
@@ -184,8 +170,15 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
 
     debug("printing custom commit output", verbose);
     info(&format!(
-        "{} {}, {} files changed, {}",
-        branchinfo, fileschangedpart, fileschangedcount, modeline,
+        "{} {}, {} files changed{}",
+        branchinfo,
+        fileschangedpart,
+        fileschangedcount,
+        if let Some(mode) = modeline {
+            format!(", {}", mode)
+        } else {
+            String::new()
+        }
     ));
     info(&format!(
         "{} insertions, {} deletions",
