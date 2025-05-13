@@ -66,7 +66,7 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
             .trim_start_matches('[')
             .trim_end_matches(']');
         let hashpart = firstlineparts[1].trim();
-        format!("[branch: {}, hash: {}]", branchpart, hashpart)
+        format!("[branch: {}, hash: {}", branchpart, hashpart)
     } else {
         String::new()
     };
@@ -177,10 +177,15 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
             String::new()
         }
     ));
-    info(&format!(
-        "    {} insertions, {} deletions",
-        insertions, deletions
-    ));
+    println!(
+        "{}",
+        format!(
+            "    {}{}{}",
+            style(format!("{} insertions (+)", insertions)).green(),
+            style(", ").magenta(),
+            style(format!("{} deletions (-)", deletions)).red()
+        )
+    );
 
     if let Some(modeline) = modeline {
         let modeparts = modeline.split_whitespace().collect::<Vec<&str>>();
