@@ -64,4 +64,11 @@ pub struct Args {
         action = clap::ArgAction::Count
     )]
     pub verbose: u8,
+
+    #[arg(
+        long = "exit",
+        short = 'E',
+        help = "stops meow when an error is occured"
+    )]
+    pub exitonerror: bool,
 }

@@ -11,8 +11,6 @@ use std::{
         Arc,
         atomic::{AtomicBool, Ordering},
     },
-    thread,
-    time::Duration,
 };
 
 mod args;
@@ -35,6 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     debug("initializing flags", &verbose);
     let dryrun = args.dryrun;
     let force = args.force;
+    let exitonerror = args.exitonerror;
 
     if args.meow {
         info("meow meow :3");
@@ -74,7 +73,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    // let message = args.commitmessage;
     let message = match args.commitmessage {
         Some(message) => message,
         None => String::from(""),
@@ -90,14 +88,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(toadd) => match stage(&reporoot, &toadd, &dryrun, &verbose) {
             Err(e) => {
                 error(&e);
-                exit(1);
+                if exitonerror {
+                    exit(1);
+                }
             }
             _ => (),
         },
         None => match stageall(&reporoot, &dryrun, &verbose) {
             Err(e) => {
                 error(&e);
-                exit(1);
+                if exitonerror {
+                    exit(1);
+                }
             }
             _ => (),
         },
@@ -108,7 +110,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match commit(&reporoot, &message, &dryrun, &verbose) {
         Err(e) => {
             error(&e);
-            exit(1);
+            if exitonerror {
+                exit(1);
+            }
         }
         _ => (),
     }
@@ -119,7 +123,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         match push(&reporoot, Some(&upstream), &dryrun, &force, &verbose) {
             Err(e) => {
                 error(&e);
-                exit(1)
+                if exitonerror {
+                    exit(1);
+                }
             }
             _ => (),
         }
@@ -127,7 +133,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         match push(&reporoot, None, &dryrun, &force, &verbose) {
             Err(e) => {
                 error(&e);
-                exit(1);
+                if exitonerror {
+                    exit(1);
+                }
             }
             _ => (),
         }
@@ -254,7 +262,10 @@ fn stageall(repopath: &Path, dryrun: &bool, verbose: &u8) -> Result<(), String> 
             printcommandoutput(o);
             Ok(())
         }
-        Err(e) => Err(format!("could not stage all: {}", e)),
+        Err(e) => {
+            debug(&format!("error: {}", e), verbose);
+            Err(String::from("could not stage all"))
+        }
     }
 }
 
@@ -279,15 +290,10 @@ fn stage(repopath: &Path, files: &[String], dryrun: &bool, verbose: &u8) -> Resu
         }
         Err(e) => {
             if e.contains("did not match any files") {
-                Err(format!(
-                    "    could not stage files: \n      `{}`\n    files not found",
-                    files.join(", ")
-                ))
+                debug(&format!("error: {}", e), verbose);
+                Err(String::from("    could not stage files: files not found"))
             } else {
-                Err(format!(
-                    "    could not stage files: \n      `{}`",
-                    files.join(", ")
-                ))
+                Err(String::from("    could not stage files"))
             }
         }
     }
@@ -307,9 +313,12 @@ fn commit(repopath: &Path, message: &str, dryrun: &bool, verbose: &u8) -> Result
             printcommitoutput(o, verbose);
             Ok(())
         }
-        Err(e) => Err(format!(
-            "could not commit files. are there any changes to commit?"
-        )),
+        Err(e) => {
+            debug(&format!("error: {}", e), verbose);
+            Err(format!(
+                "could not commit files. are there any changes to commit?"
+            ))
+        }
     }
 }
 
@@ -351,6 +360,9 @@ fn push(
             }
             Ok(())
         }
-        Err(e) => Err(format!("could not push to remote: {}", style(e).red())),
+        Err(e) => {
+            debug(&format!("error: {}", e), verbose);
+            Err(String::from("could not push to remote"))
+        }
     }
 }
