@@ -1,5 +1,5 @@
 use crate::{args::Args, loggers::*};
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use console::{Emoji, style};
 use homedir::my_home;
 use std::{
@@ -27,7 +27,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         i.store(true, Ordering::SeqCst);
     })?;
 
-    let args = Args::parse();
+    let args = match Args::try_parse() {
+        Ok(p) => p,
+        Err(err) => {
+            let commandname = String::from(Args::command().get_name());
+            let usage = Args::command().render_usage();
+            // error("error");
+
+            match err.kind() {
+                _ => println!("{}", &format!("{}", style(err).red())),
+            }
+
+            println!("{}", important("usage: "));
+            println!("{}", info(&commandname));
+            println!("{}", style(usage).magenta().dim());
+
+            exit(1);
+        }
+    };
     let verbose = args.verbose;
     let run = args.run;
     debug("initializing flags", &verbose);
@@ -143,7 +160,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     success("done");
 
     if dryrun {
-        info("\ndry run complete")
+        info("\ndry run complete");
+        return Ok(());
     }
 
     info(&format!("{}", Emoji("\n😼", "\n:3")));

@@ -218,20 +218,22 @@ pub fn error(text: &str) {
     term.write_line(&format!("{}", style(text).red())).unwrap();
 }
 
-pub fn important(text: &str) {
-    println!("{}", style(text).cyan());
+pub fn important(text: &str) -> String {
+    format!("{}", style(text).cyan())
 }
 
-pub fn info(text: &str) {
-    println!("{}", style(text).magenta());
+pub fn info(text: &str) -> String {
+    format!("{}", style(text).magenta())
 }
 
-pub fn debug(text: &str, verbose: &u8) {
+pub fn debug(text: &str, verbose: &u8) -> String {
     if verbose.to_owned() >= 1 {
-        println!("[DEBUG] {}", style(text).blue());
+        format!("[DEBUG] {}", style(text).blue())
+    } else {
+        String::new()
     }
 }
 
-pub fn success(text: &str) {
-    println!("{}", style(text).green());
+pub fn success(text: &str) -> String {
+    format!("{}", style(text).green())
 }

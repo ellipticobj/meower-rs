@@ -1,4 +1,8 @@
-use clap::Parser;
+use std::process::exit;
+
+use crate::loggers::*;
+use clap::{CommandFactory, Parser};
+use console::style;
 
 #[derive(Parser, Debug)]
 #[command(
