@@ -7,6 +7,12 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Output, exit},
     str,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    thread,
+    time::Duration,
 };
 
 mod args;
@@ -15,6 +21,14 @@ mod loggers;
 const VERSION: &str = "0.0.1-rs";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let interrupted = Arc::new(AtomicBool::new(false));
+    let i = interrupted.clone();
+
+    ctrlc::set_handler(move || {
+        error("\nexiting...");
+        i.store(true, Ordering::SeqCst);
+    })?;
+
     let args = Args::parse();
     let verbose = args.verbose;
     let run = args.run;
@@ -290,11 +304,12 @@ fn commit(repopath: &Path, message: &str, dryrun: &bool, verbose: &u8) -> Result
 
     match runcommand(repopath, args) {
         Ok(o) => {
-            // printcommandoutput(o);
             printcommitoutput(o, verbose);
             Ok(())
         }
-        Err(e) => Err(format!("could not commit files: {}", e)),
+        Err(e) => Err(format!(
+            "could not commit files. are there any changes to commit?"
+        )),
     }
 }
 
