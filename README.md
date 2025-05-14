@@ -25,13 +25,13 @@ make sure ~/.cargo is on your path!
 # in progress
 
 - [ ] custom clap error output
-- [ ] custom commit command output
 - [ ] add progress bars + spinners
 - [ ] add flags for running git commands
 - [x] proper output
 - [x] custom --version styling
 - [x] fix commit output printing
 - [x] add flags for commit message
+- [x] custom commit command output
 - [x] add flags for setting upstream
 - [x] add flags for staging certain files
 - [x] add force and force with lease flags
