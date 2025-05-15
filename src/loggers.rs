@@ -218,12 +218,12 @@ pub fn error(text: &str) {
     term.write_line(&format!("{}", style(text).red())).unwrap();
 }
 
-pub fn important(text: &str) -> String {
-    format!("{}", style(text).cyan())
+pub fn important(text: &str) {
+    println!("{}", style(text).cyan());
 }
 
-pub fn info(text: &str) -> String {
-    format!("{}", style(text).magenta())
+pub fn info(text: &str) {
+    println!("{}", style(text).magenta());
 }
 
 pub fn debug(text: &str, verbose: &u8) -> String {

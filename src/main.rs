@@ -48,8 +48,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 _ => println!("{}", &format!("{}\n", style(errormsg).red())),
             }
 
-            println!("{}", important("usage: "));
-            print!("{}", info(&commandname));
+            println!("{}", style("usage: ").cyan());
+            print!("{}", style(&commandname).magenta());
             println!("{}", style(usage).magenta().dim());
 
             exit(1);
