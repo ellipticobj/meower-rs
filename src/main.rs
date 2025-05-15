@@ -3,14 +3,15 @@ use clap::{CommandFactory, Parser};
 use console::{Emoji, style};
 use homedir::my_home;
 use std::{
-    io::{Error, ErrorKind},
+    io::{BufRead, BufReader, Error, ErrorKind},
     path::{Path, PathBuf},
-    process::{Command, Output, exit},
+    process::{Command, Output, Stdio, exit},
     str,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
     },
+    thread,
 };
 
 mod args;
@@ -146,25 +147,49 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     success("done");
 
     info("\npushing...");
-    if let Some(upstream) = args.upstream {
-        match push(&reporoot, Some(&upstream), &dryrun, &force, &verbose) {
-            Err(e) => {
-                error(&e);
-                if exitonerror {
-                    exit(1);
+    if args.livepush {
+        if let Some(upstream) = args.upstream {
+            match push(&reporoot, Some(&upstream), &dryrun, &force, &verbose) {
+                Err(e) => {
+                    error(&e);
+                    if exitonerror {
+                        exit(1);
+                    }
                 }
+                _ => (),
             }
-            _ => (),
+        } else {
+            match push(&reporoot, None, &dryrun, &force, &verbose) {
+                Err(e) => {
+                    error(&e);
+                    if exitonerror {
+                        exit(1);
+                    }
+                }
+                _ => (),
+            }
         }
     } else {
-        match push(&reporoot, None, &dryrun, &force, &verbose) {
-            Err(e) => {
-                error(&e);
-                if exitonerror {
-                    exit(1);
+        if let Some(upstream) = args.upstream {
+            match livepush(&reporoot, Some(&upstream), &dryrun, &force, &verbose) {
+                Err(e) => {
+                    error(&e);
+                    if exitonerror {
+                        exit(1);
+                    }
                 }
+                _ => (),
             }
-            _ => (),
+        } else {
+            match livepush(&reporoot, None, &dryrun, &force, &verbose) {
+                Err(e) => {
+                    error(&e);
+                    if exitonerror {
+                        exit(1);
+                    }
+                }
+                _ => (),
+            }
         }
     }
     success("done");
@@ -393,4 +418,137 @@ fn push(
             Err(String::from("could not push to remote"))
         }
     }
+}
+
+fn pushlite(
+    repopath: &Path,
+    args: Vec<&str>,
+    upstream: Option<&str>,
+    verbose: &u8,
+) -> Result<(), String> {
+    match runcommand(repopath, &args) {
+        Ok(o) => {
+            printcommandoutput(o);
+            if let Some(branch) = upstream {
+                success(&format!("  pushed to remote {}", branch));
+            } else {
+                success("  pushed to remote");
+            }
+            Ok(())
+        }
+        Err(e) => {
+            debug(&format!("error: {}", e), verbose);
+            Err(String::from("could not push to remote"))
+        }
+    }
+}
+
+fn livepush(
+    repopath: &Path,
+    upstream: Option<&str>,
+    dryrun: &bool,
+    force: &u8,
+    verbose: &u8,
+) -> Result<(), String> {
+    let mut command = Command::new("git");
+    let mut args = vec!["push"];
+    if let Some(upstreamval) = upstream {
+        debug(&format!("upstream {} was specified", upstreamval), verbose);
+        args.extend(["--set-upstream", "origin", upstreamval]);
+    }
+    if force.to_owned() == 1 {
+        debug("force was specified, using force-with-lease", verbose);
+        args.extend(["--force-with-lease"])
+    }
+    if force.to_owned() >= 2 {
+        debug("force was specified twice, using force", verbose);
+        args.extend(["--force"])
+    }
+
+    if *dryrun {
+        debug("dry run was specified, not pushing", verbose);
+        printcommand(&args);
+        return Ok(());
+    }
+
+    command.args(&args);
+
+    debug("dry run was not specified, pushing", verbose);
+    debug("piping stdout and stderr", verbose);
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+    debug("spawning child process", verbose);
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(e) => {
+            return Err(format!(
+                "{}",
+                style(format!("failed to spawn child process: {}", e)).red()
+            ));
+        }
+    };
+
+    debug("taking ownership of stdout and stderr", verbose);
+    let stdout = match child.stdout.take() {
+        Some(stdout) => stdout,
+        None => {
+            debug(
+                "failed to capture stdout, falling back to pushlite",
+                verbose,
+            );
+            pushlite(repopath, args, upstream, verbose)?;
+            return Ok(());
+        }
+    };
+    let stderr = match child.stderr.take() {
+        Some(stdout) => stdout,
+        None => {
+            debug(
+                "failed to capture stderr, falling back to pushlite",
+                verbose,
+            );
+            pushlite(repopath, args, upstream, verbose)?;
+            return Ok(());
+        }
+    };
+
+    let mut stdoutreader = BufReader::new(stdout);
+    let mut stderrreader = BufReader::new(stderr);
+
+    let stdoutthread = thread::spawn(move || {
+        let mut line = String::new();
+        while stdoutreader.read_line(&mut line).unwrap() > 0 {
+            print!("{}", line);
+            line.clear();
+        }
+    });
+
+    let stderrthread = thread::spawn(move || {
+        let mut line = String::new();
+        while stderrreader.read_line(&mut line).unwrap() > 0 {
+            print!("{}", line);
+            line.clear();
+        }
+    });
+
+    stdoutthread.join().expect("stdout thread panicked");
+    stderrthread.join().expect("stderr thread panicked");
+
+    let status = match child.wait() {
+        Ok(child) => child,
+        Err(e) => {
+            return Err(format!(
+                "{}",
+                style(format!("failed to exit child process: {}", e)).red()
+            ));
+        }
+    };
+
+    if status.success() {
+        return Ok(());
+    } else {
+        eprintln!("git push failed with status: {}", status);
+    }
+
+    Ok(())
 }

@@ -71,4 +71,7 @@ pub struct Args {
         help = "stops meow when an error is occured"
     )]
     pub exitonerror: bool,
+
+    #[arg(long = "livepush", short = 'l', help = "new livepush function (WIP)")]
+    pub livepush: bool,
 }
