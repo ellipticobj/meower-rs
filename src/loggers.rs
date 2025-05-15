@@ -226,14 +226,12 @@ pub fn info(text: &str) {
     println!("{}", style(text).magenta());
 }
 
-pub fn debug(text: &str, verbose: &u8) -> String {
+pub fn debug(text: &str, verbose: &u8) {
     if verbose.to_owned() >= 1 {
-        format!("[DEBUG] {}", style(text).blue())
-    } else {
-        String::new()
+        println!("[DEBUG] {}", style(text).blue())
     }
 }
 
-pub fn success(text: &str) -> String {
-    format!("{}", style(text).green())
+pub fn success(text: &str) {
+    println!("{}", style(text).green());
 }
