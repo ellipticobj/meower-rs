@@ -31,15 +31,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(p) => p,
         Err(err) => {
             let commandname = String::from(Args::command().get_name());
-            let usage = Args::command().render_usage();
+            let mut usage = Args::command().render_usage().to_string();
             // error("error");
 
+            usage = String::from(usage.strip_prefix("Usage: ").unwrap());
+            usage = String::from(usage.strip_prefix(&format!("{}", commandname)).unwrap());
+
+            let erroroutput = format!("{}", err);
+            let errormsg = if let Some((before, _)) = erroroutput.split_once("\n\n") {
+                before
+            } else {
+                &erroroutput
+            };
+
             match err.kind() {
-                _ => println!("{}", &format!("{}", style(err).red())),
+                _ => println!("{}", &format!("{}\n", style(errormsg).red())),
             }
 
             println!("{}", important("usage: "));
-            println!("{}", info(&commandname));
+            print!("{}", info(&commandname));
             println!("{}", style(usage).magenta().dim());
 
             exit(1);
