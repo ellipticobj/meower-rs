@@ -17,7 +17,7 @@ use std::{
 mod args;
 mod loggers;
 
-const VERSION: &str = "0.0.1-rs";
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let interrupted = Arc::new(AtomicBool::new(false));
@@ -31,6 +31,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = match Args::try_parse() {
         Ok(p) => p,
         Err(err) => {
+            important("\nmeow");
+            important(&format!("version {}\n", VERSION));
+
             let commandname = String::from(Args::command().get_name());
             let mut usage = Args::command().render_usage().to_string();
             // error("error");
@@ -62,6 +65,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dryrun = args.dryrun;
     let force = args.force;
     let exitonerror = args.exitonerror;
+    let mut steps = vec![
+        String::from("stage"),
+        String::from("commit"),
+        String::from("push"),
+    ];
 
     if args.meow {
         info("meow meow :3");
@@ -110,29 +118,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         info("dry run\n");
     }
 
-    info("staging changes...");
-    debug("checking if files were specified to be staged", &verbose);
-    match args.add {
-        Some(toadd) => match stage(&reporoot, &toadd, &dryrun, &verbose) {
-            Err(e) => {
-                error(&e);
-                if exitonerror {
-                    exit(1);
+    if steps.contains(&String::from("stage")) {
+        info("staging changes...");
+        debug("checking if files were specified to be staged", &verbose);
+        match args.add {
+            Some(toadd) => match stage(&reporoot, &toadd, &dryrun, &verbose) {
+                Err(e) => {
+                    error(&e);
+                    if exitonerror {
+                        exit(1);
+                    }
                 }
-            }
-            _ => (),
-        },
-        None => match stageall(&reporoot, &dryrun, &verbose) {
-            Err(e) => {
-                error(&e);
-                if exitonerror {
-                    exit(1);
+                _ => (),
+            },
+            None => match stageall(&reporoot, &dryrun, &verbose) {
+                Err(e) => {
+                    error(&e);
+                    if exitonerror {
+                        exit(1);
+                    }
                 }
-            }
-            _ => (),
-        },
+                _ => (),
+            },
+        }
+        success("done");
     }
-    success("done");
 
     info("\ncommitting...");
     match commit(&reporoot, &message, &dryrun, &verbose) {
@@ -312,7 +322,7 @@ fn stageall(repopath: &Path, dryrun: &bool, verbose: &u8) -> Result<(), String> 
 
     match runcommand(repopath, args) {
         Ok(o) => {
-            printcommandoutput(o);
+            printcommandoutput(o, Some(2));
             Ok(())
         }
         Err(e) => {
@@ -338,7 +348,7 @@ fn stage(repopath: &Path, files: &[String], dryrun: &bool, verbose: &u8) -> Resu
         &args.iter().map(|a| a.as_str()).collect::<Vec<&str>>(),
     ) {
         Ok(o) => {
-            printcommandoutput(o);
+            printcommandoutput(o, Some(2));
             Ok(())
         }
         Err(e) => {
@@ -369,9 +379,17 @@ fn commit(repopath: &Path, message: &str, dryrun: &bool, verbose: &u8) -> Result
         Err(e) => {
             debug(&format!("error: {}", e), verbose);
             Err(format!(
-                "could not commit files. are there any changes to commit?"
+                "    could not commit files. are there any changes to commit?"
             ))
         }
+    }
+}
+
+fn parsecommiterror(e: String) -> String {
+    if e.contains("fatal: unable to auto-detect email address") {
+        String::from(
+            "could not detect email address. use git config --global user.email \"you@email.com\"",
+        )
     }
 }
 
@@ -405,7 +423,7 @@ fn push(
     debug("dry run was not specified, pushing", verbose);
     match runcommand(repopath, &args) {
         Ok(o) => {
-            printcommandoutput(o);
+            printcommandoutput(o, Some(2));
             if let Some(branch) = upstream {
                 success(&format!("  pushed to remote {}", branch));
             } else {
@@ -428,7 +446,7 @@ fn pushlite(
 ) -> Result<(), String> {
     match runcommand(repopath, &args) {
         Ok(o) => {
-            printcommandoutput(o);
+            printcommandoutput(o, Some(2));
             if let Some(branch) = upstream {
                 success(&format!("  pushed to remote {}", branch));
             } else {
@@ -518,8 +536,8 @@ fn livepush(
     let stdoutthread = thread::spawn(move || {
         let mut line = String::new();
         while stdoutreader.read_line(&mut line).unwrap() > 0 {
-            print!("{}", line);
-            line.clear();
+            info(&format!("  {}", line));
+            // TODO: line.clear();
         }
     });
 

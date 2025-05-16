@@ -1,6 +1,6 @@
 [package]
 name = "meow"
-version = "0.0.0"
+version = "0.0.2-rs"
 edition = "2024"
 description = "a simple git wrapper. rust version of the original: https://github.com/ellipticobj/meower"
 readme = "README.md"

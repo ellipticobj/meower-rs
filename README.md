@@ -23,11 +23,10 @@ make sure ~/.cargo is on your path!
 ![screenshot](assets/screenshot.png)
 
 # in progress
-
-- [ ] custom clap error output
 - [ ] add progress bars + spinners
 - [ ] add flags for running git commands
 - [x] proper output
+- [x] custom clap error output
 - [x] custom --version styling
 - [x] fix commit output printing
 - [x] add flags for commit message
