@@ -2,6 +2,7 @@ use crate::{args::Args, loggers::*};
 use clap::{CommandFactory, Parser};
 use console::{Emoji, style};
 use homedir::my_home;
+use indicatif::ProgressBar;
 use std::{
     io::{BufRead, BufReader, Error, ErrorKind},
     path::{Path, PathBuf},
@@ -36,7 +37,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let commandname = String::from(Args::command().get_name());
             let mut usage = Args::command().render_usage().to_string();
-            // error("error");
 
             usage = String::from(usage.strip_prefix("Usage: ").unwrap());
             usage = String::from(usage.strip_prefix(&format!("{}", commandname)).unwrap());
@@ -59,13 +59,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             exit(1);
         }
     };
+
     let verbose = args.verbose;
     let run = args.run;
     debug("initializing flags", &verbose);
     let dryrun = args.dryrun;
     let force = args.force;
     let exitonerror = args.exitonerror;
-    let mut steps = vec![
+    let steps = vec![
         String::from("stage"),
         String::from("commit"),
         String::from("push"),
@@ -118,6 +119,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         info("dry run\n");
     }
 
+    let mainbar = ProgressBar::new(steps.len() as u64);
     if steps.contains(&String::from("stage")) {
         info("staging changes...");
         debug("checking if files were specified to be staged", &verbose);
@@ -142,67 +144,74 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
         }
         success("done");
+        mainbar.inc(1);
     }
 
-    info("\ncommitting...");
-    match commit(&reporoot, &message, &dryrun, &verbose) {
-        Err(e) => {
-            error(&e);
-            if exitonerror {
-                exit(1);
+    if steps.contains(&String::from("commit")) {
+        info("\ncommitting...");
+        match commit(&reporoot, &message, &dryrun, &verbose) {
+            Err(e) => {
+                error(&e);
+                if exitonerror {
+                    exit(1);
+                }
             }
+            _ => (),
         }
-        _ => (),
+        success("done");
+        mainbar.inc(1);
     }
-    success("done");
 
-    info("\npushing...");
-    if args.livepush {
-        if let Some(upstream) = args.upstream {
-            match push(&reporoot, Some(&upstream), &dryrun, &force, &verbose) {
-                Err(e) => {
-                    error(&e);
-                    if exitonerror {
-                        exit(1);
+    if steps.contains(&String::from("push")) {
+        info("\npushing...");
+        if args.livepush {
+            if let Some(upstream) = args.upstream {
+                match push(&reporoot, Some(&upstream), &dryrun, &force, &verbose) {
+                    Err(e) => {
+                        error(&e);
+                        if exitonerror {
+                            exit(1);
+                        }
                     }
+                    _ => (),
                 }
-                _ => (),
+            } else {
+                match push(&reporoot, None, &dryrun, &force, &verbose) {
+                    Err(e) => {
+                        error(&e);
+                        if exitonerror {
+                            exit(1);
+                        }
+                    }
+                    _ => (),
+                }
             }
         } else {
-            match push(&reporoot, None, &dryrun, &force, &verbose) {
-                Err(e) => {
-                    error(&e);
-                    if exitonerror {
-                        exit(1);
+            if let Some(upstream) = args.upstream {
+                match livepush(&reporoot, Some(&upstream), &dryrun, &force, &verbose) {
+                    Err(e) => {
+                        error(&e);
+                        if exitonerror {
+                            exit(1);
+                        }
                     }
+                    _ => (),
                 }
-                _ => (),
+            } else {
+                match livepush(&reporoot, None, &dryrun, &force, &verbose) {
+                    Err(e) => {
+                        error(&e);
+                        if exitonerror {
+                            exit(1);
+                        }
+                    }
+                    _ => (),
+                }
             }
         }
-    } else {
-        if let Some(upstream) = args.upstream {
-            match livepush(&reporoot, Some(&upstream), &dryrun, &force, &verbose) {
-                Err(e) => {
-                    error(&e);
-                    if exitonerror {
-                        exit(1);
-                    }
-                }
-                _ => (),
-            }
-        } else {
-            match livepush(&reporoot, None, &dryrun, &force, &verbose) {
-                Err(e) => {
-                    error(&e);
-                    if exitonerror {
-                        exit(1);
-                    }
-                }
-                _ => (),
-            }
-        }
+        success("done");
+        mainbar.inc(1);
     }
-    success("done");
 
     if dryrun {
         info("\ndry run complete");
@@ -378,18 +387,29 @@ fn commit(repopath: &Path, message: &str, dryrun: &bool, verbose: &u8) -> Result
         }
         Err(e) => {
             debug(&format!("error: {}", e), verbose);
-            Err(format!(
-                "    could not commit files. are there any changes to commit?"
-            ))
+            Err(parsecommiterror(e, verbose))
         }
     }
 }
 
-fn parsecommiterror(e: String) -> String {
+fn parsecommiterror(e: String, verbose: &u8) -> String {
+    debug("parsing commit error", verbose);
     if e.contains("fatal: unable to auto-detect email address") {
+        debug("email address couldnt be auto-detected", verbose);
         String::from(
             "could not detect email address. use git config --global user.email \"you@email.com\"",
         )
+    } else if e.contains("No changes to commit")
+        || e.contains("nothing to commit, working tree clean")
+    {
+        debug("no changes to commit", verbose);
+        String::from("    nothing to commit :3 meow")
+    } else if e.contains("empty commit message") {
+        debug("commit message is empty", verbose);
+        String::from("    provide a valid commit message")
+    } else {
+        debug("could not detect error type", verbose);
+        String::from("    could not commit files. are there any changes to commit?")
     }
 }
 
