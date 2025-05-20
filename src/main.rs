@@ -124,7 +124,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         info("staging changes...");
         debug("checking if files were specified to be staged", &verbose);
         match args.add {
-            Some(toadd) => match stage(&reporoot, &toadd, &dryrun, &verbose) {
+            Some(toadd) => match stage(&reporoot, &toadd, &dryrun, &verbose, &Some(mainbar)) {
                 Err(e) => {
                     error(&e);
                     if exitonerror {
@@ -133,7 +133,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 _ => (),
             },
-            None => match stageall(&reporoot, &dryrun, &verbose) {
+            None => match stageall(&reporoot, &dryrun, &verbose, &Some(mainbar)) {
                 Err(e) => {
                     error(&e);
                     if exitonerror {
@@ -149,7 +149,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if steps.contains(&String::from("commit")) {
         info("\ncommitting...");
-        match commit(&reporoot, &message, &dryrun, &verbose) {
+        match commit(&reporoot, &message, &dryrun, &verbose, &Some(mainbar)) {
             Err(e) => {
                 error(&e);
                 if exitonerror {
@@ -166,7 +166,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         info("\npushing...");
         if args.livepush {
             if let Some(upstream) = args.upstream {
-                match push(&reporoot, Some(&upstream), &dryrun, &force, &verbose) {
+                match push(
+                    &reporoot,
+                    Some(&upstream),
+                    &dryrun,
+                    &force,
+                    &verbose,
+                    &Some(mainbar),
+                ) {
                     Err(e) => {
                         error(&e);
                         if exitonerror {
@@ -176,7 +183,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     _ => (),
                 }
             } else {
-                match push(&reporoot, None, &dryrun, &force, &verbose) {
+                match push(&reporoot, None, &dryrun, &force, &verbose, &Some(mainbar)) {
                     Err(e) => {
                         error(&e);
                         if exitonerror {
@@ -188,7 +195,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         } else {
             if let Some(upstream) = args.upstream {
-                match livepush(&reporoot, Some(&upstream), &dryrun, &force, &verbose) {
+                match livepush(
+                    &reporoot,
+                    Some(&upstream),
+                    &dryrun,
+                    &force,
+                    &verbose,
+                    &Some(mainbar),
+                ) {
                     Err(e) => {
                         error(&e);
                         if exitonerror {
@@ -198,7 +212,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     _ => (),
                 }
             } else {
-                match livepush(&reporoot, None, &dryrun, &force, &verbose) {
+                match livepush(&reporoot, None, &dryrun, &force, &verbose, &Some(mainbar)) {
                     Err(e) => {
                         error(&e);
                         if exitonerror {
@@ -279,9 +293,13 @@ fn createcommand<'a>(args: &[&'a str]) -> Vec<&'a str> {
     command
 }
 
-fn runcommand(repopath: &Path, args: &[&str]) -> Result<Output, String> {
+fn runcommand(
+    repopath: &Path,
+    args: &[&str],
+    pbar: &Option<ProgressBar>,
+) -> Result<Output, String> {
     let commandparts = createcommand(args);
-    printcommand(&commandparts);
+    printcommand(&commandparts, pbar);
 
     if commandparts.is_empty() {
         return Err("cannot execute an empty command.".to_string());
@@ -319,17 +337,22 @@ fn runcommand(repopath: &Path, args: &[&str]) -> Result<Output, String> {
     }
 }
 
-fn stageall(repopath: &Path, dryrun: &bool, verbose: &u8) -> Result<(), String> {
+fn stageall(
+    repopath: &Path,
+    dryrun: &bool,
+    verbose: &u8,
+    pbar: &Option<ProgressBar>,
+) -> Result<(), String> {
     debug("no files were specified, staging all", verbose);
     let args = &["add", "."];
 
     if *dryrun {
         debug("debug was specified, not staging", verbose);
-        printcommand(&args.to_vec());
+        printcommand(&args.to_vec(), pbar);
         return Ok(());
     }
 
-    match runcommand(repopath, args) {
+    match runcommand(repopath, args, pbar) {
         Ok(o) => {
             printcommandoutput(o, Some(2));
             Ok(())
@@ -341,20 +364,30 @@ fn stageall(repopath: &Path, dryrun: &bool, verbose: &u8) -> Result<(), String> 
     }
 }
 
-fn stage(repopath: &Path, files: &[String], dryrun: &bool, verbose: &u8) -> Result<(), String> {
+fn stage(
+    repopath: &Path,
+    files: &[String],
+    dryrun: &bool,
+    verbose: &u8,
+    pbar: &Option<ProgressBar>,
+) -> Result<(), String> {
     debug(&format!("files {:#?} were specified", files), verbose);
     let mut args = vec!["add".to_owned()];
     args.extend(files.iter().cloned());
 
     if *dryrun {
         debug("debug was specified, not staging", verbose);
-        printcommand(&args.iter().map(|a| a.as_str()).collect::<Vec<&str>>());
+        printcommand(
+            &args.iter().map(|a| a.as_str()).collect::<Vec<&str>>(),
+            pbar,
+        );
         return Ok(());
     }
 
     match runcommand(
         repopath,
         &args.iter().map(|a| a.as_str()).collect::<Vec<&str>>(),
+        pbar,
     ) {
         Ok(o) => {
             printcommandoutput(o, Some(2));
@@ -371,16 +404,22 @@ fn stage(repopath: &Path, files: &[String], dryrun: &bool, verbose: &u8) -> Resu
     }
 }
 
-fn commit(repopath: &Path, message: &str, dryrun: &bool, verbose: &u8) -> Result<(), String> {
+fn commit(
+    repopath: &Path,
+    message: &str,
+    dryrun: &bool,
+    verbose: &u8,
+    pbar: &Option<ProgressBar>,
+) -> Result<(), String> {
     let args = &["commit", "-m", message];
 
     if *dryrun {
         debug("dry run was specified, not committing", verbose);
-        printcommand(&args.to_vec());
+        printcommand(&args.to_vec(), pbar);
         return Ok(());
     }
 
-    match runcommand(repopath, args) {
+    match runcommand(repopath, args, pbar) {
         Ok(o) => {
             printcommitoutput(o, verbose);
             Ok(())
@@ -419,6 +458,7 @@ fn push(
     dryrun: &bool,
     force: &u8,
     verbose: &u8,
+    pbar: &Option<ProgressBar>,
 ) -> Result<(), String> {
     let mut args = vec!["push"];
     if let Some(upstreamval) = upstream {
@@ -436,12 +476,12 @@ fn push(
 
     if *dryrun {
         debug("dry run was specified, not pushing", verbose);
-        printcommand(&args);
+        printcommand(&args, pbar);
         return Ok(());
     }
 
     debug("dry run was not specified, pushing", verbose);
-    match runcommand(repopath, &args) {
+    match runcommand(repopath, &args, pbar) {
         Ok(o) => {
             printcommandoutput(o, Some(2));
             if let Some(branch) = upstream {
@@ -463,8 +503,9 @@ fn pushlite(
     args: Vec<&str>,
     upstream: Option<&str>,
     verbose: &u8,
+    pbar: &Option<ProgressBar>,
 ) -> Result<(), String> {
-    match runcommand(repopath, &args) {
+    match runcommand(repopath, &args, pbar) {
         Ok(o) => {
             printcommandoutput(o, Some(2));
             if let Some(branch) = upstream {
@@ -487,6 +528,7 @@ fn livepush(
     dryrun: &bool,
     force: &u8,
     verbose: &u8,
+    pbar: &Option<ProgressBar>,
 ) -> Result<(), String> {
     let mut command = Command::new("git");
     let mut args = vec!["push"];
@@ -505,7 +547,7 @@ fn livepush(
 
     if *dryrun {
         debug("dry run was specified, not pushing", verbose);
-        printcommand(&args);
+        printcommand(&args, pbar);
         return Ok(());
     }
 
@@ -534,7 +576,7 @@ fn livepush(
                 "failed to capture stdout, falling back to pushlite",
                 verbose,
             );
-            pushlite(repopath, args, upstream, verbose)?;
+            pushlite(repopath, args, upstream, verbose, pbar)?;
             return Ok(());
         }
     };
@@ -545,7 +587,7 @@ fn livepush(
                 "failed to capture stderr, falling back to pushlite",
                 verbose,
             );
-            pushlite(repopath, args, upstream, verbose)?;
+            pushlite(repopath, args, upstream, verbose, pbar)?;
             return Ok(());
         }
     };

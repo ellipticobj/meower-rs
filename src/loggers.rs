@@ -1,6 +1,7 @@
 use crate::args::Args;
 use clap::CommandFactory;
 use console::{Term, style};
+use indicatif::ProgressBar;
 use std::{num::ParseIntError, process::Output};
 
 pub fn printhelp() {
@@ -29,8 +30,13 @@ pub fn printhelp() {
     }
 }
 
-pub fn printcommand(command: &Vec<&str>) {
-    println!("  {}", style(command.join(" ")).cyan());
+pub fn printcommand(command: &Vec<&str>, pbar: &Option<ProgressBar>) {
+    let msg = format!("  {}", style(command.join(" ")).cyan());
+    if let Some(pbar) = pbar {
+        pbar.println(msg)
+    } else {
+        println!("{}", msg);
+    }
 }
 
 pub fn printcommandoutput(output: Output, spaces: Option<u8>) {
