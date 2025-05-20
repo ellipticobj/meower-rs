@@ -2,7 +2,7 @@ use crate::{args::Args, loggers::*};
 use clap::{CommandFactory, Parser};
 use console::{Emoji, style};
 use homedir::my_home;
-use indicatif::ProgressBar;
+use indicatif::{MultiProgress, ProgressBar};
 use std::{
     io::{BufRead, BufReader, Error, ErrorKind},
     path::{Path, PathBuf},
@@ -119,7 +119,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         info("dry run\n");
     }
 
-    let mainbar = ProgressBar::new(steps.len() as u64);
+    let multiprogress = MultiProgress::new();
+    let mainbar = multiprogress.add(ProgressBar::new(steps.len() as u64));
     if steps.contains(&String::from("stage")) {
         info("staging changes...");
         debug("checking if files were specified to be staged", &verbose);
@@ -218,6 +219,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+    mainbar.finish();
     info(&format!("{}", Emoji("\n😼", "\n:3")));
     Ok(())
 }
