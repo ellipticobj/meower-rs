@@ -124,16 +124,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         info("staging changes...");
         debug("checking if files were specified to be staged", &verbose);
         match args.add {
-            Some(toadd) => match stage(&reporoot, &toadd, &dryrun, &verbose, &Some(mainbar)) {
-                Err(e) => {
-                    error(&e);
-                    if exitonerror {
-                        exit(1);
+            Some(toadd) => {
+                match stage(&reporoot, &toadd, &dryrun, &verbose, &Some(mainbar.clone())) {
+                    Err(e) => {
+                        error(&e);
+                        if exitonerror {
+                            exit(1);
+                        }
                     }
+                    _ => (),
                 }
-                _ => (),
-            },
-            None => match stageall(&reporoot, &dryrun, &verbose, &Some(mainbar)) {
+            }
+            None => match stageall(&reporoot, &dryrun, &verbose, &Some(mainbar.clone())) {
                 Err(e) => {
                     error(&e);
                     if exitonerror {
@@ -149,7 +151,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if steps.contains(&String::from("commit")) {
         info("\ncommitting...");
-        match commit(&reporoot, &message, &dryrun, &verbose, &Some(mainbar)) {
+        match commit(
+            &reporoot,
+            &message,
+            &dryrun,
+            &verbose,
+            &Some(mainbar.clone()),
+        ) {
             Err(e) => {
                 error(&e);
                 if exitonerror {
@@ -172,7 +180,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     &dryrun,
                     &force,
                     &verbose,
-                    &Some(mainbar),
+                    &Some(mainbar.clone()),
                 ) {
                     Err(e) => {
                         error(&e);
@@ -183,7 +191,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     _ => (),
                 }
             } else {
-                match push(&reporoot, None, &dryrun, &force, &verbose, &Some(mainbar)) {
+                match push(
+                    &reporoot,
+                    None,
+                    &dryrun,
+                    &force,
+                    &verbose,
+                    &Some(mainbar.clone()),
+                ) {
                     Err(e) => {
                         error(&e);
                         if exitonerror {
@@ -201,7 +216,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     &dryrun,
                     &force,
                     &verbose,
-                    &Some(mainbar),
+                    &Some(mainbar.clone()),
                 ) {
                     Err(e) => {
                         error(&e);
@@ -212,7 +227,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     _ => (),
                 }
             } else {
-                match livepush(&reporoot, None, &dryrun, &force, &verbose, &Some(mainbar)) {
+                match livepush(
+                    &reporoot,
+                    None,
+                    &dryrun,
+                    &force,
+                    &verbose,
+                    &Some(mainbar.clone()),
+                ) {
                     Err(e) => {
                         error(&e);
                         if exitonerror {
