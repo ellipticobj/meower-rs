@@ -30,13 +30,9 @@ pub fn printhelp() {
     }
 }
 
-pub fn printcommand(command: &Vec<&str>, pbar: &Option<ProgressBar>) {
+pub fn printcommand(command: &Vec<&str>) {
     let msg = format!("  {}", style(command.join(" ")).cyan());
-    if let Some(pbar) = pbar {
-        pbar.println(msg)
-    } else {
-        println!("{}", msg);
-    }
+    eprintln!("{}", msg);
 }
 
 pub fn printcommandoutput(output: Output, spaces: Option<u8>) {
@@ -212,38 +208,24 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
     }
 }
 
-pub fn _fatalerror(error: &str) {
-    let term = Term::stderr();
-    term.write_line(&format!("{}", style("error: ").red()))
-        .unwrap();
-    term.write_line(&format!("  {}", style(error).red()))
-        .unwrap();
-    term.write_line(&format!(
-        "{}",
-        style("run `meow -h` for detailed help").red()
-    ))
-    .unwrap();
-}
-
 pub fn error(text: &str) {
-    let term = Term::stderr();
-    term.write_line(&format!("{}", style(text).red())).unwrap();
+    eprintln!("{}", style(text).red());
 }
 
 pub fn important(text: &str) {
-    println!("{}", style(text).cyan());
+    eprintln!("{}", style(text).cyan());
 }
 
 pub fn info(text: &str) {
-    println!("{}", style(text).magenta());
+    eprintln!("{}", style(text).magenta());
 }
 
 pub fn debug(text: &str, verbose: &u8) {
     if verbose.to_owned() >= 1 {
-        println!("[DEBUG] {}", style(text).blue())
+        eprintln!("[DEBUG] {}", style(text).blue())
     }
 }
 
 pub fn success(text: &str) {
-    println!("{}", style(text).green());
+    eprintln!("{}", style(text).green());
 }
