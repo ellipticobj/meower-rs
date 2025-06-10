@@ -30,13 +30,9 @@ pub fn printhelp() {
     }
 }
 
-pub fn printcommand(command: &Vec<&str>, pbar: &Option<ProgressBar>) {
+pub fn printcommand(command: &Vec<&str>) {
     let msg = format!("  {}", style(command.join(" ")).cyan());
-    if let Some(pbar) = pbar {
-        pbar.println(msg)
-    } else {
-        println!("{}", msg);
-    }
+    println!("{}", msg);
 }
 
 pub fn printcommandoutput(output: Output) {
