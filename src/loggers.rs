@@ -1,45 +1,41 @@
 use crate::args::Args;
 use clap::CommandFactory;
-use console::style;
+use console::{Term, style};
+use indicatif::ProgressBar;
 use std::{num::ParseIntError, process::Output};
 
-pub fn printhelp() -> String {
+pub fn printhelp() {
     let mut cmd = Args::command();
     let helptext = cmd.render_help().to_string();
 
-    let mut out = vec![];
-    let indentation = 0;
-
     for line in helptext.lines() {
         if line.starts_with("Usage:") {
-            println!("{}", important(&format!(
+            important(&format!(
                 "usage: {}",
                 line.strip_prefix("Usage:").unwrap_or(line)
-            )));
+            ));
         } else if line.starts_with("Arguments:") {
-            println!("{}", important(&format!(
+            important(&format!(
                 "arguments: {}",
                 line.strip_prefix("Arguments:").unwrap_or(line)
-            )));
+            ));
         } else if line.starts_with("Options:") {
-            println!("{}", important(&format!(
+            important(&format!(
                 "options: {}",
                 line.strip_prefix("Options:").unwrap_or(line)
-            )));
+            ));
         } else {
-            out.push(format!("{}{}", " ".repeat(indentation as usize), line));
+            info(line);
         }
     }
-
-    out.join("\n")
 }
 
-pub fn getcommand(command: &Vec<&str>) -> String {
-    format!("  {}", style(command.join(" ")).cyan())
+pub fn printcommand(command: &Vec<&str>) {
+    let msg = format!("  {}", style(command.join(" ")).cyan());
+    eprintln!("{}", msg);
 }
 
-pub fn getcommandoutput(output: Output, spaces: Option<u8>) -> String {
-    let mut out = vec![];
+pub fn printcommandoutput(output: Output, spaces: Option<u8>) {
     let indentation = if let Some(indentation) = spaces {
         indentation
     } else {
@@ -49,11 +45,9 @@ pub fn getcommandoutput(output: Output, spaces: Option<u8>) -> String {
     let stdout = String::from_utf8_lossy(&output.stdout);
     if !stdout.trim().is_empty() {
         for line in stdout.lines() {
-            out.push(format!("{}{}", " ".repeat(indentation as usize), line));
+            info(&format!("{}{}", " ".repeat(indentation as usize), line));
         }
     }
-
-    out.join("\n")
 }
 
 fn parsecount(s: &str) -> Result<i32, ParseIntError> {
@@ -67,7 +61,7 @@ fn parsecount(s: &str) -> Result<i32, ParseIntError> {
 }
 
 pub fn printcommitoutput(output: Output, verbose: &u8) {
-    println!("{}", debug("parsing commit command output", verbose));
+    debug("parsing commit command output", verbose);
     let rawstdout = output.stdout.clone();
     let stdout = String::from_utf8_lossy(&rawstdout);
     let mut lines = stdout.lines();
@@ -88,7 +82,7 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
     let mut fileschangedline: Option<&str> = None;
     let mut modeline: Option<&str> = None;
 
-    println!("{}", debug("searching output lines", verbose));
+    debug("searching output lines", verbose);
     for line in lines {
         if line.contains("files changed")
             || line.contains("file changed")
@@ -102,32 +96,32 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
             modeline = Some(line);
         }
     }
-    println!("{}", debug("done", verbose));
+    debug("done", verbose);
 
     if fileschangedline.is_none() {
-        println!("{}", debug(
+        debug(
             &format!("raw stdout when required lines not found: {}", stdout),
             verbose,
-        ));
-        println!("{}", debug(
+        );
+        debug(
             &format!("fileschangedline: {:?}", fileschangedline),
             verbose,
-        ));
-        println!("{}", debug(&format!("modeline: {:?}", modeline), verbose));
-        println!("{}", debug("falling back to printcommandoutput()", verbose));
-        getcommandoutput(output, Some(2));
+        );
+        debug(&format!("modeline: {:?}", modeline), verbose);
+        debug("falling back to printcommandoutput()", verbose);
+        printcommandoutput(output, Some(2));
         return;
     }
 
-    println!("{}", debug("splitting files changed line", verbose));
+    debug("splitting files changed line", verbose);
     let Some(fileschangedline) = fileschangedline else {
-        println!("{}", debug(
+        debug(
             "fileschangedline was None unexpectedly (should have been caught by prior check). falling back.",
             verbose,
-        ));
-        println!("{}", debug(&format!("modeline (Option): {:?}", modeline), verbose));
-        println!("{}", debug(&format!("raw stdout: {}", stdout), verbose));
-        getcommandoutput(output, Some(2));
+        );
+        debug(&format!("modeline (Option): {:?}", modeline), verbose);
+        debug(&format!("raw stdout: {}", stdout), verbose);
+        printcommandoutput(output, Some(2));
         return;
     };
 
@@ -153,35 +147,35 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
     let insertionsres = parsecount(insertionspart);
     let deletionsres = parsecount(deletionspart);
 
-    println!("{}", debug("checking errors", verbose));
+    debug("checking errors", verbose);
     if let Err(e) = insertionsres {
-        println!("{}", debug(
+        debug(
             &format!("raw stdout on insertion parse error: {}", stdout),
             verbose,
-        ));
-        println!("{}", debug(&format!("error: {}", e), verbose));
-        println!("{}", debug("falling back to printcommandoutput()", verbose));
-        getcommandoutput(output, Some(2));
+        );
+        debug(&format!("error: {}", e), verbose);
+        debug("falling back to printcommandoutput()", verbose);
+        printcommandoutput(output, Some(2));
         return;
     }
 
     if let Err(e) = deletionsres {
-        println!("{}", debug(
+        debug(
             &format!("raw stdout on deletion parse error: {}", stdout),
             verbose,
-        ));
-        println!("{}", debug(&format!("error: {}", e), verbose));
-        println!("{}", debug("falling back to printcommandoutput()", verbose));
-        getcommandoutput(output, Some(2));
+        );
+        debug(&format!("error: {}", e), verbose);
+        debug("falling back to printcommandoutput()", verbose);
+        printcommandoutput(output, Some(2));
         return;
     }
 
-    println!("{}", debug("getting insertions and deletions", verbose));
+    debug("getting insertions and deletions", verbose);
     let insertions = insertionsres.unwrap_or(0);
     let deletions = deletionsres.unwrap_or(0);
 
-    println!("{}", debug("printing custom commit output", verbose));
-    println!("{}", info(&format!(
+    debug("printing custom commit output", verbose);
+    info(&format!(
         "    {} {} file(s) changed{}",
         branchhashinfo,
         fileschangedcount,
@@ -190,7 +184,7 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
         } else {
             String::new()
         }
-    )));
+    ));
     println!(
         "{}",
         format!(
@@ -204,36 +198,34 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
     if let Some(modeline) = modeline {
         let modeparts = modeline.split_whitespace().collect::<Vec<&str>>();
         if modeparts.len() >= 3 {
-            println!("{}", info(&format!(
+            info(&format!(
                 "    {} {} {}",
                 modeparts[0],
                 modeparts[1],
                 modeparts[2..].join(" ")
-            )));
+            ));
         }
     }
 }
 
-pub fn error(text: &str) -> String {
-    style(text).red().to_string()
+pub fn error(text: &str) {
+    eprintln!("{}", style(text).red());
 }
 
-pub fn important(text: &str) -> String {
-    style(text).cyan().to_string()
+pub fn important(text: &str) {
+    eprintln!("{}", style(text).cyan());
 }
 
-pub fn info(text: &str) -> String {
-    style(text).magenta().to_string()
+pub fn info(text: &str) {
+    eprintln!("{}", style(text).magenta());
 }
 
-pub fn debug(text: &str, verbose: &u8) -> String {
+pub fn debug(text: &str, verbose: &u8) {
     if verbose.to_owned() >= 1 {
-        format!("{}\n", style(text).blue())
-    } else {
-        String::new()
+        eprintln!("[DEBUG] {}", style(text).blue())
     }
 }
 
-pub fn success(text: &str) -> String {
-    style(text).green().to_string()
+pub fn success(text: &str) {
+    eprintln!("{}", style(text).green());
 }

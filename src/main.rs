@@ -25,15 +25,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let i = interrupted.clone();
 
     ctrlc::set_handler(move || {
-        println!("{}", error("\nexiting..."));
+        error("\nexiting...");
         i.store(true, Ordering::SeqCst);
     })?;
 
     let args = match Args::try_parse() {
         Ok(p) => p,
         Err(err) => {
-            println!("{}", important("\nmeow"));
-            println!("{}", important(&format!("version {}\n", VERSION)));
+            important("\nmeow");
+            important(&format!("version {}\n", VERSION));
 
             let commandname = String::from(Args::command().get_name());
             let mut usage = Args::command().render_usage().to_string();
@@ -62,7 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let verbose = args.verbose;
     let run = args.run;
-    print!("{}", debug("initializing flags", &verbose));
+    debug("initializing flags", &verbose);
     let dryrun = args.dryrun;
     let force = args.force;
     let exitonerror = args.exitonerror;
@@ -73,34 +73,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     if args.meow {
-        println!("{}", info("meow meow :3"));
+        info("meow meow :3");
         return Ok(());
     }
 
-    println!("{}", important("\nmeow"));
-    println!("{}", important(&format!("version {}\n", VERSION)));
+    important("\nmeow");
+    important(&format!("version {}\n", VERSION));
 
     if run {
-        println!(
-            "{}",
-            important("run flag was specified, hijacking pipeline")
-        );
-        println!("{}", important("run is not implemented yet."));
+        debug("run flag was specified, hijacking pipeline", &verbose);
+        error("run is not implemented yet.");
         return Ok(());
     }
 
-    print!("{}", debug("checking if help flag was specified", &verbose));
+    debug("checking if help flag was specified", &verbose);
     if args.help {
         println!();
-        println!("{}", printhelp());
-        print!("{}", debug("help printed, exiting", &verbose));
+        printhelp();
+        debug("help printed, exiting", &verbose);
         return Ok(());
     }
 
-    print!("{}", debug("getting repository root", &verbose));
+    debug("getting repository root", &verbose);
     let reporoot = getrootdir()?;
     let root = getcleanroot(&reporoot)?;
-    print!("{}", debug(&format!("root is {}", root), &verbose));
+    debug(&format!("root is {}", root), &verbose);
 
     println!(
         "{} {}\n",
@@ -108,10 +105,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         style(root).magenta()
     );
 
-    print!(
-        "{}",
-        debug("checking if version flag was specified", &verbose)
-    );
+    debug("checking if version flag was specified", &verbose);
     if args.version {
         return Ok(());
     }
@@ -122,24 +116,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     if dryrun {
-        println!("{}", info("dry run\n"));
+        info("dry run\n");
     }
 
     let mainbar = ProgressBar::new(steps.len() as u64);
-    
-    // Switch debug prints to use mainbar from this point
-    let print_debug = |text: &str, verbose: &u8| {
-        if *verbose >= 1 {
-            mainbar.println(&debug(text, verbose));
-        }
-    };
     if steps.contains(&String::from("stage")) {
-        mainbar.println(&info("staging changes..."));
-        print_debug("checking if files were specified to be staged", &verbose);
+        info("staging changes...");
+        debug("checking if files were specified to be staged", &verbose);
         match args.add {
             Some(toadd) => match stage(&reporoot, &toadd, &dryrun, &verbose) {
                 Err(e) => {
-                    mainbar.println(&error(&e));
+                    error(&e);
                     if exitonerror {
                         exit(1);
                     }
@@ -148,43 +135,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
             None => match stageall(&reporoot, &dryrun, &verbose) {
                 Err(e) => {
-                    mainbar.println(&error(&e));
+                    error(&e);
                     if exitonerror {
                         exit(1);
                     }
                 }
-                Ok(_) => {}
+                _ => (),
             },
         }
-        mainbar.println(&success("done"));
+        success("done");
         mainbar.inc(1);
     }
 
     if steps.contains(&String::from("commit")) {
-        mainbar.println(&info("\ncommitting..."));
+        info("\ncommitting...");
         match commit(&reporoot, &message, &dryrun, &verbose) {
             Err(e) => {
-                mainbar.println(&error(&e));
+                error(&e);
                 if exitonerror {
                     exit(1);
                 }
             }
             _ => (),
         }
-        mainbar.println(&success("done"));
+        success("done");
         mainbar.inc(1);
     }
 
     if steps.contains(&String::from("push")) {
-        mainbar.println(&info("\npushing..."));
-        if verbose >= 1 {
-            mainbar.println(&debug("preparing push command", &verbose));
-        }
+        info("\npushing...");
         if args.livepush {
             if let Some(upstream) = args.upstream {
                 match push(&reporoot, Some(&upstream), &dryrun, &force, &verbose) {
                     Err(e) => {
-                        mainbar.println(&error(&e));
+                        error(&e);
                         if exitonerror {
                             exit(1);
                         }
@@ -194,7 +178,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 match push(&reporoot, None, &dryrun, &force, &verbose) {
                     Err(e) => {
-                        mainbar.println(&error(&e));
+                        error(&e);
                         if exitonerror {
                             exit(1);
                         }
@@ -206,7 +190,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(upstream) = args.upstream {
                 match livepush(&reporoot, Some(&upstream), &dryrun, &force, &verbose) {
                     Err(e) => {
-                        mainbar.println(&error(&e));
+                        error(&e);
                         if exitonerror {
                             exit(1);
                         }
@@ -216,7 +200,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 match livepush(&reporoot, None, &dryrun, &force, &verbose) {
                     Err(e) => {
-                        mainbar.println(&error(&e));
+                        error(&e);
                         if exitonerror {
                             exit(1);
                         }
@@ -225,16 +209,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
-        mainbar.println(&success("done"));
+        success("done");
         mainbar.inc(1);
     }
 
     if dryrun {
-        mainbar.println(&info("\ndry run complete"));
+        info("\ndry run complete");
         return Ok(());
     }
 
-    mainbar.println(&info(&format!("{}", Emoji("\n😼", "\n:3"))));
+    info(&format!("{}", Emoji("\n😼", "\n:3")));
     Ok(())
 }
 
@@ -297,7 +281,7 @@ fn createcommand<'a>(args: &[&'a str]) -> Vec<&'a str> {
 
 fn runcommand(repopath: &Path, args: &[&str]) -> Result<Output, String> {
     let commandparts = createcommand(args);
-    println!("{}", getcommand(&commandparts));
+    printcommand(&commandparts);
 
     if commandparts.is_empty() {
         return Err("cannot execute an empty command.".to_string());
@@ -336,38 +320,35 @@ fn runcommand(repopath: &Path, args: &[&str]) -> Result<Output, String> {
 }
 
 fn stageall(repopath: &Path, dryrun: &bool, verbose: &u8) -> Result<(), String> {
-    println!("{}", debug("no files were specified, staging all", verbose));
+    debug("no files were specified, staging all", verbose);
     let args = &["add", "."];
 
     if *dryrun {
-        println!("{}", debug("dry run was specified, not staging", verbose));
-        println!("{}", getcommand(&args.to_vec()));
+        debug("debug was specified, not staging", verbose);
+        printcommand(&args.to_vec());
         return Ok(());
     }
 
     match runcommand(repopath, args) {
         Ok(o) => {
-            getcommandoutput(o, Some(2));
+            printcommandoutput(o, Some(2));
             Ok(())
         }
         Err(e) => {
-            println!("{}", debug(&format!("error: {}", e), verbose));
+            debug(&format!("error: {}", e), verbose);
             Err(String::from("could not stage all"))
         }
     }
 }
 
 fn stage(repopath: &Path, files: &[String], dryrun: &bool, verbose: &u8) -> Result<(), String> {
-    println!(
-        "{}",
-        debug(&format!("files {:#?} were specified", files), verbose)
-    );
+    debug(&format!("files {:#?} were specified", files), verbose);
     let mut args = vec!["add".to_owned()];
     args.extend(files.iter().cloned());
 
     if *dryrun {
-        println!("{}", debug("debug was specified, not staging", verbose));
-        println!("{}", getcommand(&args.iter().map(|a| a.as_str()).collect::<Vec<&str>>()));
+        debug("debug was specified, not staging", verbose);
+        printcommand(&args.iter().map(|a| a.as_str()).collect::<Vec<&str>>());
         return Ok(());
     }
 
@@ -376,12 +357,12 @@ fn stage(repopath: &Path, files: &[String], dryrun: &bool, verbose: &u8) -> Resu
         &args.iter().map(|a| a.as_str()).collect::<Vec<&str>>(),
     ) {
         Ok(o) => {
-            getcommandoutput(o, Some(2));
+            printcommandoutput(o, Some(2));
             Ok(())
         }
         Err(e) => {
             if e.contains("did not match any files") {
-                println!("{}", debug(&format!("error: {}", e), verbose));
+                debug(&format!("error: {}", e), verbose);
                 Err(String::from("    could not stage files: files not found"))
             } else {
                 Err(String::from("    could not stage files"))
@@ -394,11 +375,8 @@ fn commit(repopath: &Path, message: &str, dryrun: &bool, verbose: &u8) -> Result
     let args = &["commit", "-m", message];
 
     if *dryrun {
-        println!(
-            "{}",
-            debug("dry run was specified, not committing", verbose)
-        );
-        println!("{}", getcommand(&args.to_vec()));
+        debug("dry run was specified, not committing", verbose);
+        printcommand(&args.to_vec());
         return Ok(());
     }
 
@@ -408,32 +386,29 @@ fn commit(repopath: &Path, message: &str, dryrun: &bool, verbose: &u8) -> Result
             Ok(())
         }
         Err(e) => {
-            println!("{}", debug(&format!("error: {}", e), verbose));
+            debug(&format!("error: {}", e), verbose);
             Err(parsecommiterror(e, verbose))
         }
     }
 }
 
 fn parsecommiterror(e: String, verbose: &u8) -> String {
-    println!("{}", debug("parsing commit error", verbose));
+    debug("parsing commit error", verbose);
     if e.contains("fatal: unable to auto-detect email address") {
-        println!(
-            "{}",
-            debug("email address couldnt be auto-detected", verbose)
-        );
+        debug("email address couldnt be auto-detected", verbose);
         String::from(
             "could not detect email address. use git config --global user.email \"you@email.com\"",
         )
     } else if e.contains("No changes to commit")
         || e.contains("nothing to commit, working tree clean")
     {
-        println!("{}", debug("no changes to commit", verbose));
+        debug("no changes to commit", verbose);
         String::from("    nothing to commit :3 meow")
     } else if e.contains("empty commit message") {
-        println!("{}", debug("commit message is empty", verbose));
+        debug("commit message is empty", verbose);
         String::from("    provide a valid commit message")
     } else {
-        println!("{}", debug("could not detect error type", verbose));
+        debug("could not detect error type", verbose);
         String::from("    could not commit files. are there any changes to commit?")
     }
 }
@@ -447,46 +422,37 @@ fn push(
 ) -> Result<(), String> {
     let mut args = vec!["push"];
     if let Some(upstreamval) = upstream {
-        println!(
-            "{}",
-            debug(&format!("upstream {} was specified", upstreamval), verbose)
-        );
+        debug(&format!("upstream {} was specified", upstreamval), verbose);
         args.extend(["--set-upstream", "origin", upstreamval]);
     }
     if force.to_owned() == 1 {
-        println!(
-            "{}",
-            debug("force was specified, using force-with-lease", verbose)
-        );
+        debug("force was specified, using force-with-lease", verbose);
         args.extend(["--force-with-lease"])
     }
     if force.to_owned() >= 2 {
-        println!(
-            "{}",
-            debug("force was specified twice, using force", verbose)
-        );
+        debug("force was specified twice, using force", verbose);
         args.extend(["--force"])
     }
 
     if *dryrun {
-        println!("{}", debug("dry run was specified, not pushing", verbose));
-        println!("{}", getcommand(&args));
+        debug("dry run was specified, not pushing", verbose);
+        printcommand(&args);
         return Ok(());
     }
 
-    println!("{}", debug("dry run was not specified, pushing", verbose));
+    debug("dry run was not specified, pushing", verbose);
     match runcommand(repopath, &args) {
         Ok(o) => {
-            getcommandoutput(o, Some(2));
+            printcommandoutput(o, Some(2));
             if let Some(branch) = upstream {
-                println!("{}", success(&format!("  pushed to remote {}", branch)));
+                success(&format!("  pushed to remote {}", branch));
             } else {
-                println!("{}", success("  pushed to remote"));
+                success("  pushed to remote");
             }
             Ok(())
         }
         Err(e) => {
-            println!("{}", debug(&format!("error: {}", e), verbose));
+            debug(&format!("error: {}", e), verbose);
             Err(String::from("could not push to remote"))
         }
     }
@@ -500,16 +466,16 @@ fn pushlite(
 ) -> Result<(), String> {
     match runcommand(repopath, &args) {
         Ok(o) => {
-            getcommandoutput(o, Some(2));
+            printcommandoutput(o, Some(2));
             if let Some(branch) = upstream {
-                println!("{}", success(&format!("  pushed to remote {}", branch)));
+                success(&format!("  pushed to remote {}", branch));
             } else {
-                println!("{}", success("  pushed to remote"));
+                success("  pushed to remote");
             }
             Ok(())
         }
         Err(e) => {
-            println!("{}", debug(&format!("error: {}", e), verbose));
+            debug(&format!("error: {}", e), verbose);
             Err(String::from("could not push to remote"))
         }
     }
@@ -525,40 +491,31 @@ fn livepush(
     let mut command = Command::new("git");
     let mut args = vec!["push"];
     if let Some(upstreamval) = upstream {
-        print!(
-            "{}",
-            debug(&format!("upstream {} was specified", upstreamval), verbose)
-        );
+        debug(&format!("upstream {} was specified", upstreamval), verbose);
         args.extend(["--set-upstream", "origin", upstreamval]);
     }
     if force.to_owned() == 1 {
-        print!(
-            "{}",
-            debug("force was specified, using force-with-lease", verbose)
-        );
+        debug("force was specified, using force-with-lease", verbose);
         args.extend(["--force-with-lease"])
     }
     if force.to_owned() >= 2 {
-        print!(
-            "{}",
-            debug("force was specified twice, using force", verbose)
-        );
+        debug("force was specified twice, using force", verbose);
         args.extend(["--force"])
     }
 
     if *dryrun {
-        print!("{}", debug("dry run was specified, not pushing", verbose));
-        println!("{}", getcommand(&args));
+        debug("dry run was specified, not pushing", verbose);
+        printcommand(&args);
         return Ok(());
     }
 
     command.args(&args);
 
-    println!("{}", debug("dry run was not specified, pushing", verbose));
-    println!("{}", debug("piping stdout and stderr", verbose));
+    debug("dry run was not specified, pushing", verbose);
+    debug("piping stdout and stderr", verbose);
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
 
-    println!("{}", debug("spawning child process", verbose));
+    debug("spawning child process", verbose);
     let mut child = match command.spawn() {
         Ok(child) => child,
         Err(e) => {
@@ -569,19 +526,13 @@ fn livepush(
         }
     };
 
-    println!(
-        "{}",
-        debug("taking ownership of stdout and stderr", verbose)
-    );
+    debug("taking ownership of stdout and stderr", verbose);
     let stdout = match child.stdout.take() {
         Some(stdout) => stdout,
         None => {
-            println!(
-                "{}",
-                debug(
-                    "failed to capture stdout, falling back to pushlite",
-                    verbose,
-                )
+            debug(
+                "failed to capture stdout, falling back to pushlite",
+                verbose,
             );
             pushlite(repopath, args, upstream, verbose)?;
             return Ok(());
@@ -590,12 +541,9 @@ fn livepush(
     let stderr = match child.stderr.take() {
         Some(stdout) => stdout,
         None => {
-            println!(
-                "{}",
-                debug(
-                    "failed to capture stderr, falling back to pushlite",
-                    verbose,
-                )
+            debug(
+                "failed to capture stderr, falling back to pushlite",
+                verbose,
             );
             pushlite(repopath, args, upstream, verbose)?;
             return Ok(());
@@ -608,7 +556,7 @@ fn livepush(
     let stdoutthread = thread::spawn(move || {
         let mut line = String::new();
         while stdoutreader.read_line(&mut line).unwrap() > 0 {
-            println!("{}", info(&format!("  {}", line)));
+            info(&format!("  {}", line));
             // TODO: line.clear();
         }
     });
