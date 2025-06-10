@@ -39,17 +39,11 @@ pub fn printcommand(command: &Vec<&str>, pbar: &Option<ProgressBar>) {
     }
 }
 
-pub fn printcommandoutput(output: Output, spaces: Option<u8>) {
-    let indentation = if let Some(indentation) = spaces {
-        indentation
-    } else {
-        0
-    };
-
+pub fn printcommandoutput(output: Output) {
     let stdout = String::from_utf8_lossy(&output.stdout);
     if !stdout.trim().is_empty() {
         for line in stdout.lines() {
-            info(&format!("{}{}", " ".repeat(indentation as usize), line));
+            info(&format!("    {}", line));
         }
     }
 }
@@ -113,7 +107,7 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
         );
         debug(&format!("modeline: {:?}", modeline), verbose);
         debug("falling back to printcommandoutput()", verbose);
-        printcommandoutput(output, Some(2));
+        printcommandoutput(output);
         return;
     }
 
@@ -125,7 +119,7 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
         );
         debug(&format!("modeline (Option): {:?}", modeline), verbose);
         debug(&format!("raw stdout: {}", stdout), verbose);
-        printcommandoutput(output, Some(2));
+        printcommandoutput(output);
         return;
     };
 
@@ -159,7 +153,7 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
         );
         debug(&format!("error: {}", e), verbose);
         debug("falling back to printcommandoutput()", verbose);
-        printcommandoutput(output, Some(2));
+        printcommandoutput(output);
         return;
     }
 
@@ -170,7 +164,7 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
         );
         debug(&format!("error: {}", e), verbose);
         debug("falling back to printcommandoutput()", verbose);
-        printcommandoutput(output, Some(2));
+        printcommandoutput(output);
         return;
     }
 

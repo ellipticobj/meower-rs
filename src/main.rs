@@ -18,7 +18,7 @@ use std::{
 mod args;
 mod loggers;
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+const VERSION: &str = "0.0.1-rs";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let interrupted = Arc::new(AtomicBool::new(false));
@@ -32,9 +32,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = match Args::try_parse() {
         Ok(p) => p,
         Err(err) => {
-            important("\nmeow");
-            important(&format!("version {}\n", VERSION));
-
             let commandname = String::from(Args::command().get_name());
             let mut usage = Args::command().render_usage().to_string();
 
@@ -66,11 +63,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dryrun = args.dryrun;
     let force = args.force;
     let exitonerror = args.exitonerror;
-    let steps = vec![
-        String::from("stage"),
-        String::from("commit"),
-        String::from("push"),
-    ];
 
     if args.meow {
         info("meow meow :3");
@@ -119,33 +111,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         info("dry run\n");
     }
 
-    let mainbar = ProgressBar::new(steps.len() as u64);
-    if steps.contains(&String::from("stage")) {
-        info("staging changes...");
-        debug("checking if files were specified to be staged", &verbose);
-        match args.add {
-            Some(toadd) => match stage(&reporoot, &toadd, &dryrun, &verbose, &Some(mainbar)) {
-                Err(e) => {
-                    error(&e);
-                    if exitonerror {
-                        exit(1);
-                    }
+    info("staging changes...");
+    debug("checking if files were specified to be staged", &verbose);
+    match args.add {
+        Some(toadd) => match stage(&reporoot, &toadd, &dryrun, &verbose) {
+            Err(e) => {
+                error(&e);
+                if exitonerror {
+                    exit(1);
                 }
-                _ => (),
-            },
-            None => match stageall(&reporoot, &dryrun, &verbose, &Some(mainbar)) {
-                Err(e) => {
-                    error(&e);
-                    if exitonerror {
-                        exit(1);
-                    }
+            }
+            _ => (),
+        },
+        None => match stageall(&reporoot, &dryrun, &verbose) {
+            Err(e) => {
+                error(&e);
+                if exitonerror {
+                    exit(1);
                 }
-                _ => (),
-            },
-        }
-        success("done");
-        mainbar.inc(1);
+            }
+            _ => (),
+        },
     }
+    success("done");
 
     if steps.contains(&String::from("commit")) {
         info("\ncommitting...");
@@ -354,7 +342,7 @@ fn stageall(
 
     match runcommand(repopath, args, pbar) {
         Ok(o) => {
-            printcommandoutput(o, Some(2));
+            printcommandoutput(o);
             Ok(())
         }
         Err(e) => {
@@ -390,7 +378,7 @@ fn stage(
         pbar,
     ) {
         Ok(o) => {
-            printcommandoutput(o, Some(2));
+            printcommandoutput(o);
             Ok(())
         }
         Err(e) => {
@@ -426,29 +414,10 @@ fn commit(
         }
         Err(e) => {
             debug(&format!("error: {}", e), verbose);
-            Err(parsecommiterror(e, verbose))
+            Err(format!(
+                "could not commit files. are there any changes to commit?"
+            ))
         }
-    }
-}
-
-fn parsecommiterror(e: String, verbose: &u8) -> String {
-    debug("parsing commit error", verbose);
-    if e.contains("fatal: unable to auto-detect email address") {
-        debug("email address couldnt be auto-detected", verbose);
-        String::from(
-            "could not detect email address. use git config --global user.email \"you@email.com\"",
-        )
-    } else if e.contains("No changes to commit")
-        || e.contains("nothing to commit, working tree clean")
-    {
-        debug("no changes to commit", verbose);
-        String::from("    nothing to commit :3 meow")
-    } else if e.contains("empty commit message") {
-        debug("commit message is empty", verbose);
-        String::from("    provide a valid commit message")
-    } else {
-        debug("could not detect error type", verbose);
-        String::from("    could not commit files. are there any changes to commit?")
     }
 }
 
@@ -483,7 +452,7 @@ fn push(
     debug("dry run was not specified, pushing", verbose);
     match runcommand(repopath, &args, pbar) {
         Ok(o) => {
-            printcommandoutput(o, Some(2));
+            printcommandoutput(o);
             if let Some(branch) = upstream {
                 success(&format!("  pushed to remote {}", branch));
             } else {
@@ -507,7 +476,7 @@ fn pushlite(
 ) -> Result<(), String> {
     match runcommand(repopath, &args, pbar) {
         Ok(o) => {
-            printcommandoutput(o, Some(2));
+            printcommandoutput(o);
             if let Some(branch) = upstream {
                 success(&format!("  pushed to remote {}", branch));
             } else {
@@ -598,8 +567,8 @@ fn livepush(
     let stdoutthread = thread::spawn(move || {
         let mut line = String::new();
         while stdoutreader.read_line(&mut line).unwrap() > 0 {
-            info(&format!("  {}", line));
-            // TODO: line.clear();
+            print!("{}", line);
+            line.clear();
         }
     });
 
