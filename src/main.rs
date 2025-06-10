@@ -376,7 +376,7 @@ fn commit(repopath: &Path, message: &str, dryrun: &bool, verbose: &u8) -> Result
     }
 }
 
-fn push(
+fn livepush(
     repopath: &Path,
     upstream: Option<&str>,
     dryrun: &bool,
@@ -444,7 +444,7 @@ fn pushlite(
     }
 }
 
-fn livepush(
+fn push(
     repopath: &Path,
     upstream: Option<&str>,
     dryrun: &bool,
@@ -519,7 +519,7 @@ fn livepush(
     let stdoutthread = thread::spawn(move || {
         let mut line = String::new();
         while stdoutreader.read_line(&mut line).unwrap() > 0 {
-            print!("{}", line);
+            success(&format!("  {}", line));
             line.clear();
         }
     });
