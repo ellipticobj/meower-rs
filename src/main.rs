@@ -148,7 +148,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     success("done");
 
     info("\npushing...");
-    if args.livepush {
+    if !args.livepush {
         if let Some(upstream) = args.upstream {
             match push(&reporoot, Some(&upstream), &dryrun, &force, &verbose) {
                 Err(e) => {
