@@ -30,7 +30,7 @@ pub struct Args {
     #[arg(
         name = "message",
         help = "commit message",
-        required_unless_present_any = &["run", "meow"]
+        required_unless_present_any = &["run", "meow", "help", "version"]
     )]
     pub commitmessage: Option<String>,
 
@@ -72,6 +72,5 @@ pub struct Args {
     )]
     pub exitonerror: bool,
 
-    #[arg(long = "livepush", short = 'l', help = "new livepush function (WIP)")]
-    pub livepush: bool,
+    
 }

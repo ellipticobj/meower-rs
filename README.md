@@ -1,6 +1,4 @@
 # meower-rs
-**this is incomplete. use [this](https://github.com/ellipticobj/meower) instead**
-
 a rust rewrite of the [original meower](https://github.com/ellipticobj/meower)
 
 # installation
@@ -23,9 +21,11 @@ make sure ~/.cargo is on your path!
 ![screenshot](assets/screenshot.png)
 
 # in progress
-
+- [ ] add more of the basic features (--push, --add, --commit)
 - [ ] add ~~progress bars +~~ spinners
 - [ ] add flags for running git commands
+- [ ] fix push function so its less messy + output is actually good
+- [x] fix the help flag
 - [x] proper output
 - [x] custom clap error output
 - [x] custom --version styling

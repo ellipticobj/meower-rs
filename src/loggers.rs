@@ -1,33 +1,65 @@
 use crate::args::Args;
 use clap::CommandFactory;
 use console::{Term, style};
-use indicatif::ProgressBar;
 use std::{num::ParseIntError, process::Output};
 
 pub fn printhelp() {
     let mut cmd = Args::command();
     let helptext = cmd.render_help().to_string();
+    let mut usagetext = String::new();
 
     for line in helptext.lines() {
         if line.starts_with("Usage:") {
-            important(&format!(
-                "usage: {}",
-                line.strip_prefix("Usage:").unwrap_or(line)
-            ));
+            usagetext = String::from(line.strip_prefix("Usage:").unwrap_or(line));
+            important(&format!("usage: {}", usagetext));
         } else if line.starts_with("Arguments:") {
             important(&format!(
                 "arguments: {}",
                 line.strip_prefix("Arguments:").unwrap_or(line)
             ));
         } else if line.starts_with("Options:") {
-            important(&format!(
-                "options: {}",
-                line.strip_prefix("Options:").unwrap_or(line)
-            ));
+            println!(
+                "{}",
+                &format!(
+                    "{} {}",
+                    style("options:").cyan(),
+                    style(formatoptionsline(
+                        line.strip_prefix("Options:").unwrap_or(line).to_string()
+                    ))
+                )
+            );
         } else {
             info(line);
         }
     }
+
+    important(&format!("\nusage: {}", usagetext));
+}
+
+pub fn formatoptionsline(line: String) -> String {
+    let mut result = String::new();
+    let startidx: usize;
+    let endidx: usize;
+    if let Some(dashidx) = line.find('-') {
+        if let Some(commaidx) = line.find(",") {
+            startidx = dashidx + 1;
+            endidx = startidx + commaidx - 1;
+        } else {
+            startidx = dashidx + 1;
+            endidx = line.len();
+        }
+    } else {
+        startidx = 0;
+        endidx = 0;
+    }
+
+    result.push_str(&format!(
+        "{}{}",
+        style(line[startidx..endidx].trim().to_string()).bold(),
+        style(line[endidx..].trim().to_string())
+    ));
+
+    result
 }
 
 pub fn printcommand(command: &Vec<&str>) {
