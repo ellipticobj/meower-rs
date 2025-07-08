@@ -234,6 +234,52 @@ pub fn printcommitoutput(output: Output, verbose: &u8) {
     }
 }
 
+pub fn printpushoutput(output: Output, verbose: &u8) {
+    debug("parsing push command output", verbose);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let combinedoutput = format!("{}{}", stdout, stderr);
+
+    let mut remoteline = None;
+    let mut branchline = None;
+    let mut upstreamline = None;
+    let mut uptodate = false;
+
+    for line in combinedoutput.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("To ") {
+            remoteline = Some(trimmed.to_string());
+        } else if trimmed.contains("->") {
+            branchline = Some(trimmed.to_string());
+        } else if trimmed.starts_with("Branch ") {
+            upstreamline = Some(trimmed.to_string());
+        } else if trimmed == "Everything up-to-date" {
+            uptodate = true;
+        }
+    }
+
+    if uptodate {
+        info("    Everything up-to-date");
+        return;
+    }
+
+    if remoteline.is_none() && branchline.is_none() && upstreamline.is_none() {
+        debug("Could not parse push output, falling back", verbose);
+        printcommandoutput(output);
+        return;
+    }
+
+    if let Some(line) = remoteline {
+        info(&format!("    {}", line));
+    }
+    if let Some(line) = branchline {
+        info(&format!("    {}", line));
+    }
+    if let Some(line) = upstreamline {
+        info(&format!("    {}", line));
+    }
+}
+
 pub fn _fatalerror(error: &str) {
     let term = Term::stderr();
     term.write_line(&format!("{}", style("error: ").red()))

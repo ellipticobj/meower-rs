@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Output, exit},
     str,
-    sync:{
+    sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
     },
@@ -109,7 +109,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         info("dry run\n");
     }
 
-    info!("staging changes...");
+    info("staging changes...");
     debug("checking if files were specified to be staged", &verbose);
     match args.add {
         Some(toadd) => match stage(&reporoot, &toadd, &dryrun, &verbose) {
@@ -133,7 +133,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     success("done");
 
-    info!("\ncommitting...");
+    info("\ncommitting...");
     match commit(&reporoot, &message, &dryrun, &verbose) {
         Err(e) => {
             error(&e);
@@ -145,7 +145,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     success("done");
 
-    info!("\npushing...");
+    info("\npushing...");
     match push(
         &reporoot,
         args.upstream.as_deref(),
@@ -374,12 +374,7 @@ fn push(
     debug("dry run was not specified, pushing", verbose);
     match runcommand(repopath, &args) {
         Ok(o) => {
-            printcommandoutput(o);
-            if let Some(branch) = upstream {
-                success(&format!("  pushed to remote {}", branch));
-            } else {
-                success("  pushed to remote");
-            }
+            printpushoutput(o, verbose);
             Ok(())
         }
         Err(e) => {
