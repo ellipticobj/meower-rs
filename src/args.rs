@@ -9,6 +9,7 @@ use clap::Parser;
     disable_version_flag = true,
     disable_help_flag = true
 )]
+
 pub struct Args {
     #[arg(
         short,
@@ -65,12 +66,22 @@ pub struct Args {
     )]
     pub verbose: u8,
 
-    #[arg(
-        long = "exit",
-        short = 'E',
-        help = "stops meow when an error is occured"
-    )]
+    #[arg(long = "exit", short = 'E', help = "exits meow on error")]
     pub exitonerror: bool,
 
-    
+    #[arg(long = "push", short = 'p', help = "pushes")]
+    pub pushonly: bool,
+
+    #[arg(long = "commit", short = 'c', help = "commits")]
+    pub commitonly: bool,
+
+    #[arg(long = "remote-add", aliases = ["radd"], help = "same as git remote add")]
+    pub addremote: bool,
+
+    #[arg(
+        long = "remote-remove",
+        aliases = ["rrm"],
+        help = "same as git remote remove"
+    )]
+    pub removeremote: bool,
 }

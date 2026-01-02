@@ -1,6 +1,6 @@
 [package]
 name = "meow"
-version = "0.0.1-rs-b"
+version = "0.0.2-rs"
 edition = "2024"
 description = "a simple git wrapper. rust version of the original: https://github.com/ellipticobj/meower"
 readme = "README.md"
@@ -11,8 +11,8 @@ categories = ["git", "command-line-tool"]
 
 [dependencies]
 clap = { version = "4.5.37", features = ["derive"] }
-console = "0.15.11"
-dialoguer = "0.11.0"
-indicatif = "0.17.11"
+console = "0.16.1"
+dialoguer = "0.12.0"
+indicatif = "0.18.3"
 homedir = "0.3.4"
-ctrlc = "3.4.7"
+ctrlc = "3.5.1"

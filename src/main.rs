@@ -59,6 +59,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let verbose = args.verbose;
     let run = args.run;
     debug("initializing flags", &verbose);
+    let remoteadd = args.addremote;
+    let remoteremove = args.removeremote;
     let dryrun = args.dryrun;
     let force = args.force;
     let exitonerror = args.exitonerror;
@@ -84,9 +86,47 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+    debug("checking if add remote was specified", &verbose);
+    if remoteadd {
+        debug("add remote flag was specified", &verbose);
+        error("add remote is not implemented yet.");
+        return Ok(());
+    }
+
+    debug("checking if remove remote was specified", &verbose);
+    if remoteremove {
+        debug("remove remote flag was specified", &verbose);
+        error("remove remote is not implemented yet.");
+        return Ok(());
+    }
+
     debug("getting repository root", &verbose);
-    let reporoot = getrootdir()?;
-    let root = getcleanroot(&reporoot)?;
+    let reporoot = match getrootdir() {
+        Ok(r) => r,
+        Err(e) => {
+            let errorstr = e.to_string();
+
+            if errorstr.contains("not a git repository") {
+                error("not a git repository. are you in the correct path?");
+            } else {
+                error(&errorstr);
+            }
+
+            if verbose > 0 {
+                return Err(Box::new(e));
+            } else {
+                exit(1);
+            }
+        }
+    };
+
+    let root = match getcleanroot(&reporoot) {
+        Ok(r) => r,
+        Err(e) => {
+            error("unexpected error while getting clean root");
+            return Err(e);
+        }
+    };
     debug(&format!("root is {}", root), &verbose);
 
     println!(
@@ -380,6 +420,29 @@ fn push(
         Err(e) => {
             debug(&format!("error: {}", e), verbose);
             Err(String::from("could not push to remote"))
+        }
+    }
+}
+
+fn addremote(repopath: &Path, dryrun: &bool, verbose: &u8) -> Result<(), String> {
+    let mut args = vec!["remote", "add", "origin"];
+    args.push(repopath.to_str().unwrap());
+
+    if *dryrun {
+        debug("dry run was specified, not adding remote", verbose);
+        printcommand(&args);
+        return Ok(());
+    }
+
+    debug("dry run was not specified, adding remote", verbose);
+    match runcommand(repopath, &args) {
+        Ok(o) => {
+            printcommandoutput(o);
+            Ok(())
+        }
+        Err(e) => {
+            debug(&format!("error: {}", e), verbose);
+            Err(String::from("could not add remote"))
         }
     }
 }
