@@ -17,6 +17,7 @@ mod args;
 mod loggers;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut runcommitpipeline = true;
     let interrupted = Arc::new(AtomicBool::new(false));
     let i = interrupted.clone();
 
@@ -67,7 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if args.meow {
         info("meow meow :3");
-        return Ok(());
+        // return Ok(());
     }
 
     important("\nmeow");
@@ -83,20 +84,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if args.help {
         printhelp();
         debug("help printed, exiting", &verbose);
-        return Ok(());
-    }
-
-    debug("checking if add remote was specified", &verbose);
-    if remoteadd {
-        debug("add remote flag was specified", &verbose);
-        error("add remote is not implemented yet.");
-        return Ok(());
-    }
-
-    debug("checking if remove remote was specified", &verbose);
-    if remoteremove {
-        debug("remove remote flag was specified", &verbose);
-        error("remove remote is not implemented yet.");
         return Ok(());
     }
 
@@ -149,10 +136,69 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         info("dry run\n");
     }
 
-    info("staging changes...");
-    debug("checking if files were specified to be staged", &verbose);
-    match args.add {
-        Some(toadd) => match stage(&reporoot, &toadd, &dryrun, &verbose) {
+    debug("checking if add remote was specified", &verbose);
+    if remoteadd.is_some() {
+        debug("add remote flag was specified", &verbose);
+        info("  EXPERIMENTAL: adding remote 'origin'...");
+        match addremote(
+            &reporoot,
+            "origin",
+            remoteadd.unwrap_or_default().as_str(),
+            &dryrun,
+            &verbose,
+        ) {
+            Ok(r) => r,
+            Err(e) => {
+                info("");
+                error(&e);
+                exit(1);
+            }
+        };
+        runcommitpipeline = false;
+    }
+
+    debug("checking if remove remote was specified", &verbose);
+    if remoteremove {
+        debug("remove remote flag was specified", &verbose);
+        info("  EXPERIMENTAL: removing remote 'origin'...");
+        match removeremote(&reporoot, "origin", &dryrun, &verbose) {
+            Ok(r) => r,
+            Err(e) => {
+                info("");
+                error(&e);
+                exit(1);
+            }
+        };
+        runcommitpipeline = false;
+    }
+
+    if runcommitpipeline {
+        info("staging changes...");
+        debug("checking if files were specified to be staged", &verbose);
+        match args.add {
+            Some(toadd) => match stage(&reporoot, &toadd, &dryrun, &verbose) {
+                Err(e) => {
+                    error(&e);
+                    if exitonerror {
+                        exit(1);
+                    }
+                }
+                _ => (),
+            },
+            None => match stageall(&reporoot, &dryrun, &verbose) {
+                Err(e) => {
+                    error(&e);
+                    if exitonerror {
+                        exit(1);
+                    }
+                }
+                _ => (),
+            },
+        }
+        success("done");
+
+        info("\ncommitting...");
+        match commit(&reporoot, &message, &dryrun, &verbose) {
             Err(e) => {
                 error(&e);
                 if exitonerror {
@@ -160,8 +206,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             _ => (),
-        },
-        None => match stageall(&reporoot, &dryrun, &verbose) {
+        }
+        success("done");
+
+        info("\npushing...");
+        match push(
+            &reporoot,
+            args.upstream.as_deref(),
+            &dryrun,
+            &force,
+            &verbose,
+        ) {
             Err(e) => {
                 error(&e);
                 if exitonerror {
@@ -169,37 +224,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             _ => (),
-        },
-    }
-    success("done");
-
-    info("\ncommitting...");
-    match commit(&reporoot, &message, &dryrun, &verbose) {
-        Err(e) => {
-            error(&e);
-            if exitonerror {
-                exit(1);
-            }
         }
-        _ => (),
-    }
-    success("done");
-
-    info("\npushing...");
-    match push(
-        &reporoot,
-        args.upstream.as_deref(),
-        &dryrun,
-        &force,
-        &verbose,
-    ) {
-        Err(e) => {
-            error(&e);
-            if exitonerror {
-                exit(1);
-            }
-        }
-        _ => (),
     }
     success("done");
 
@@ -208,7 +233,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    info(&format!("{}", Emoji("\n😼", "\n:3")));
+    info(&format!("{}", Emoji("\n😼", "\n>:3")));
     Ok(())
 }
 
@@ -251,7 +276,7 @@ fn getcleanroot(reporoot: &PathBuf) -> Result<String, Box<dyn std::error::Error>
     let cleanroot = if let Some(homedir) = homediropt {
         if reporoot.starts_with(&homedir) {
             let relpath = reporoot.strip_prefix(&homedir)?;
-            format!("~/ {}", relpath.display())
+            format!("~/{}", relpath.display())
         } else {
             reporoot.to_string_lossy().into_owned()
         }
@@ -424,9 +449,45 @@ fn push(
     }
 }
 
-fn addremote(repopath: &Path, dryrun: &bool, verbose: &u8) -> Result<(), String> {
-    let mut args = vec!["remote", "add", "origin"];
-    args.push(repopath.to_str().unwrap());
+fn addremote(
+    repopath: &Path,
+    remotename: &str,
+    remoteurl: &str,
+    dryrun: &bool,
+    verbose: &u8,
+) -> Result<(), String> {
+    let args = vec!["remote", "add", remotename, remoteurl];
+
+    if *dryrun {
+        debug("dry run was specified, not adding remote", verbose);
+        printcommand(&args);
+        return Ok(());
+    }
+
+    debug("dry run was not specified, adding remote", verbose);
+    match runcommand(repopath, &args) {
+        Ok(o) => {
+            printcommandoutput(o);
+            Ok(())
+        }
+        Err(e) => {
+            debug(&format!("error: {}", e), verbose);
+            if e.contains("[<options>]") {
+                Err("could not add remote: url not specified".to_string())
+            } else {
+                Err("could not add remote".to_string())
+            }
+        }
+    }
+}
+
+fn removeremote(
+    repopath: &Path,
+    remotename: &str,
+    dryrun: &bool,
+    verbose: &u8,
+) -> Result<(), String> {
+    let args = vec!["remote", "remove", remotename];
 
     if *dryrun {
         debug("dry run was specified, not adding remote", verbose);

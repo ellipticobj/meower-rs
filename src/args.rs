@@ -12,8 +12,6 @@ use clap::Parser;
 
 pub struct Args {
     #[arg(
-        short,
-        long,
         short = 'a',
         long = "add",
         name = "files",
@@ -31,7 +29,14 @@ pub struct Args {
     #[arg(
         name = "message",
         help = "commit message",
-        required_unless_present_any = &["run", "meow", "help", "version"]
+        required_unless_present_any = &[
+            "run",
+            "meow",
+            "help",
+            "version",
+            "addremote",
+            "removeremote"
+        ]
     )]
     pub commitmessage: Option<String>,
 
@@ -41,10 +46,10 @@ pub struct Args {
     #[arg(short = 'h', long = "help", help = "prints help")]
     pub help: bool,
 
-    #[arg(long = "meow", hide(true))]
+    #[arg(long = "meow", hide = true)]
     pub meow: bool,
 
-    #[arg(long = "run", short = 'r', help = "run git commands", hide(true))]
+    #[arg(long = "run", short = 'r', help = "run git commands", hide = true)]
     pub run: bool,
 
     #[arg(long = "set-upstream", short = 'u', help = "sets upstream")]
@@ -75,13 +80,17 @@ pub struct Args {
     #[arg(long = "commit", short = 'c', help = "commits")]
     pub commitonly: bool,
 
-    #[arg(long = "remote-add", aliases = ["radd"], help = "same as git remote add")]
-    pub addremote: bool,
+    #[arg(
+        long = "add-remote",
+        aliases = ["radd"],
+        help = "EXPERIMENTAL: same as git remote add (remote name is 'origin' for now)"
+    )]
+    pub addremote: Option<String>,
 
     #[arg(
-        long = "remote-remove",
+        long = "remove-remote",
         aliases = ["rrm"],
-        help = "same as git remote remove"
+        help = "EXPERIMENTAL: same as git remote remove (remote name is 'origin' for now)"
     )]
     pub removeremote: bool,
 }
