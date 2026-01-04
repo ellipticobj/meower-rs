@@ -17,7 +17,9 @@ mod args;
 mod loggers;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut runstagepipeline = true;
     let mut runcommitpipeline = true;
+    let mut runpushpipeline = true;
     let interrupted = Arc::new(AtomicBool::new(false));
     let i = interrupted.clone();
 
@@ -127,6 +129,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+    debug("checking if pushonly was specified", &verbose);
+    if args.pushonly {
+        debug("pushonly flag was specified", &verbose);
+        runstagepipeline = false;
+        runcommitpipeline = false;
+    }
+
+    debug("checking if commitonly was specified", &verbose);
+    if args.commitonly {
+        debug("commitonly flag was specified", &verbose);
+        runstagepipeline = false;
+        runpushpipeline = false;
+    }
+
+    debug("checking if stageonly was specified", &verbose);
+    if args.stageonly {
+        debug("stageonly flag was specified", &verbose);
+        runcommitpipeline = false;
+        runpushpipeline = false;
+    }
+
     let message = match args.commitmessage {
         Some(message) => message,
         None => String::from(""),
@@ -154,7 +177,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 exit(1);
             }
         };
+        runstagepipeline = false;
         runcommitpipeline = false;
+        runpushpipeline = false;
     }
 
     debug("checking if remove remote was specified", &verbose);
@@ -169,10 +194,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 exit(1);
             }
         };
+        runstagepipeline = false;
         runcommitpipeline = false;
+        runpushpipeline = false;
     }
 
-    if runcommitpipeline {
+    if runstagepipeline {
         info("staging changes...");
         debug("checking if files were specified to be staged", &verbose);
         match args.add {
@@ -196,7 +223,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
         }
         success("done");
+    }
 
+    if runcommitpipeline {
         info("\ncommitting...");
         match commit(&reporoot, &message, &dryrun, &verbose) {
             Err(e) => {
@@ -208,7 +237,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             _ => (),
         }
         success("done");
+    }
 
+    if runpushpipeline {
         info("\npushing...");
         match push(
             &reporoot,

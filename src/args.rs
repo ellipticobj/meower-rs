@@ -33,6 +33,7 @@ pub struct Args {
             "run",
             "meow",
             "help",
+            "pushonly",
             "version",
             "addremote",
             "removeremote"
@@ -74,11 +75,14 @@ pub struct Args {
     #[arg(long = "exit", short = 'E', help = "exits meow on error")]
     pub exitonerror: bool,
 
-    #[arg(long = "push", short = 'p', help = "pushes")]
+    #[arg(long = "push", short = 'p', help = "pushes only")]
     pub pushonly: bool,
 
-    #[arg(long = "commit", short = 'c', help = "commits")]
+    #[arg(long = "commit", short = 'c', help = "commits only")]
     pub commitonly: bool,
+
+    #[arg(long = "stage", short = 's', help = "stages only")]
+    pub stageonly: bool,
 
     #[arg(
         long = "add-remote",
