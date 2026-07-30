@@ -1,5 +1,7 @@
 use clap::Parser;
 
+// command-line surface for meow. clap's built-in --help and --version are disabled
+// so main.rs can render them through the tool's own styled output helpers instead.
 #[derive(Parser, Debug)]
 #[command(
     author,
@@ -26,6 +28,8 @@ pub struct Args {
     )]
     pub dryrun: bool,
 
+    // positional commit message. required unless one of the flags in the list makes
+    // the commit step unnecessary (help/version banners, push-only, remote management).
     #[arg(
         name = "message",
         help = "commit message",
@@ -50,12 +54,14 @@ pub struct Args {
     #[arg(long = "meow", hide = true)]
     pub meow: bool,
 
+    // todo: `--run` is a placeholder for arbitrary git passthrough; still unimplemented
     #[arg(long = "run", short = 'r', help = "run git commands", hide = true)]
     pub run: bool,
 
     #[arg(long = "set-upstream", short = 'u', help = "sets upstream")]
     pub upstream: Option<String>,
 
+    // -f enables --force-with-lease, -ff escalates to --force
     #[arg(
         long = "force",
         short = 'f',
@@ -64,6 +70,7 @@ pub struct Args {
     )]
     pub force: u8,
 
+    // count-based so -v, -vv, -vvv can gate progressively noisier debug output
     #[arg(
         long = "verbose",
         short = 'v',
@@ -84,6 +91,7 @@ pub struct Args {
     #[arg(long = "stage", short = 's', help = "stages only")]
     pub stageonly: bool,
 
+    // todo: expose the remote name as an argument instead of hardcoding "origin"
     #[arg(
         long = "add-remote",
         aliases = ["radd"],

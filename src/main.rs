@@ -3,6 +3,7 @@ use clap::{CommandFactory, Parser};
 use console::{Emoji, style};
 use homedir::my_home;
 use std::{
+    env::args,
     io::{Error, ErrorKind},
     path::{Path, PathBuf},
     process::{Command, Output, exit},
@@ -17,29 +18,44 @@ mod args;
 mod loggers;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // each pipeline stage runs by default; --push/--commit/--stage narrow this down later
     let mut runstagepipeline = true;
     let mut runcommitpipeline = true;
     let mut runpushpipeline = true;
     let interrupted = Arc::new(AtomicBool::new(false));
     let i = interrupted.clone();
 
+    // trap ctrl-c so downstream checks can see it, rather than aborting mid-command
     ctrlc::set_handler(move || {
         error("\nexiting...");
         i.store(true, Ordering::SeqCst);
     })?;
 
+    // bare invocation: show help and exit rather than error out on a missing commit message
+    if args().len() <= 1 {
+        printhelp();
+        exit(0);
+    }
+
+    if args().collect::<Vec<String>>()[1] == "meow" {
+        println!("meow meow :3");
+    }
+
     let args = match Args::try_parse() {
         Ok(p) => p,
         Err(err) => {
+            // custom error rendering: replace clap's default formatting with the tool's colour scheme
             important("\nmeow");
             important(&format!("version {}\n", env!("CARGO_PKG_VERSION")));
 
             let commandname = String::from(Args::command().get_name());
             let mut usage = Args::command().render_usage().to_string();
 
+            // strip "Usage: <binname>" so the two halves can be styled separately below
             usage = String::from(usage.strip_prefix("Usage: ").unwrap());
             usage = String::from(usage.strip_prefix(&format!("{}", commandname)).unwrap());
 
+            // clap appends a help hint after a blank line; keep only the message before it
             let erroroutput = format!("{}", err);
             let errormsg = if let Some((before, _)) = erroroutput.split_once("\n\n") {
                 before
@@ -59,6 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
+    // pull flags into locals so `args` isn't borrowed for the rest of main
     let verbose = args.verbose;
     let run = args.run;
     debug("initializing flags", &verbose);
@@ -68,14 +85,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let force = args.force;
     let exitonerror = args.exitonerror;
 
-    if args.meow {
-        info("meow meow :3");
-        // return Ok(());
-    }
-
     important("\nmeow");
     important(&format!("version {}\n", env!("CARGO_PKG_VERSION")));
 
+    // `--run` is reserved for future arbitrary git passthrough; bail out for now
     if run {
         debug("run flag was specified, hijacking pipeline", &verbose);
         error("run is not implemented yet.");
@@ -90,6 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     debug("getting repository root", &verbose);
+    // absolute repo path used as cwd for all subsequent git invocations
     let reporoot = match getrootdir() {
         Ok(r) => r,
         Err(e) => {
@@ -101,6 +115,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 error(&errorstr);
             }
 
+            // surface the full error only in verbose mode; otherwise just exit cleanly
             if verbose > 0 {
                 return Err(Box::new(e));
             } else {
@@ -109,6 +124,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
+    // display-only path with `~` collapsed for home directory
     let root = match getcleanroot(&reporoot) {
         Ok(r) => r,
         Err(e) => {
@@ -125,10 +141,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     debug("checking if version flag was specified", &verbose);
+    // version banner is already printed above; nothing more to do
     if args.version {
         return Ok(());
     }
 
+    // each *only flag isolates a single pipeline stage by disabling the others
     debug("checking if pushonly was specified", &verbose);
     if args.pushonly {
         debug("pushonly flag was specified", &verbose);
@@ -150,6 +168,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         runpushpipeline = false;
     }
 
+    // clap makes the commit message optional under certain flag combos; fall back to empty
     let message = match args.commitmessage {
         Some(message) => message,
         None => String::from(""),
@@ -159,6 +178,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         info("dry run\n");
     }
 
+    // remote management short-circuits the pipeline: add/remove is the whole task
+    // todo: allow a configurable remote name instead of hardcoding "origin"
     debug("checking if add remote was specified", &verbose);
     if remoteadd.is_some() {
         debug("add remote flag was specified", &verbose);
@@ -177,6 +198,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 exit(1);
             }
         };
+        // skip stage/commit/push when the user only wants to manage remotes
         runstagepipeline = false;
         runcommitpipeline = false;
         runpushpipeline = false;
@@ -199,6 +221,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         runpushpipeline = false;
     }
 
+    // stage stage: `-a` selects specific files, otherwise stage everything with `git add .`
     if runstagepipeline {
         info("staging changes...");
         debug("checking if files were specified to be staged", &verbose);
@@ -206,6 +229,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Some(toadd) => match stage(&reporoot, &toadd, &dryrun, &verbose) {
                 Err(e) => {
                     error(&e);
+                    // by default we continue to the next stage; --exit makes any failure fatal
                     if exitonerror {
                         exit(1);
                     }
@@ -225,6 +249,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         success("done");
     }
 
+    // commit stage
     if runcommitpipeline {
         info("\ncommitting...");
         match commit(&reporoot, &message, &dryrun, &verbose) {
@@ -239,6 +264,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         success("done");
     }
 
+    // push stage: `-u <branch>` sets upstream, `-f`/`-ff` selects the force level
     if runpushpipeline {
         info("\npushing...");
         match push(
@@ -264,12 +290,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+    // final cat face; falls back to ascii when the terminal cannot render the emoji
     info(&format!("{}", Emoji("\n😼", "\n>:3")));
     Ok(())
 }
 
+// resolves the absolute path of the enclosing git repository, or errors if there isn't one
 fn getrootdir() -> Result<PathBuf, std::io::Error> {
-    // git rev-parse --show-toplevel
+    // `git rev-parse --show-toplevel` prints the repo root to stdout
     let mut command = Command::new("git");
     command.arg("rev-parse").arg("--show-toplevel");
 
@@ -285,6 +313,7 @@ fn getrootdir() -> Result<PathBuf, std::io::Error> {
         let root = PathBuf::from(stdout.trim());
         Ok(root)
     } else {
+        // most likely cause: not inside a git repo. surface the raw stderr for other cases
         let stderr = str::from_utf8(&output.stderr).map_err(|e| {
             Error::new(
                 ErrorKind::InvalidData,
@@ -301,6 +330,7 @@ fn getrootdir() -> Result<PathBuf, std::io::Error> {
     }
 }
 
+// collapses the home-directory prefix into `~` for a shorter display path
 fn getcleanroot(reporoot: &PathBuf) -> Result<String, Box<dyn std::error::Error>> {
     let homediropt = my_home()?;
 
@@ -309,15 +339,18 @@ fn getcleanroot(reporoot: &PathBuf) -> Result<String, Box<dyn std::error::Error>
             let relpath = reporoot.strip_prefix(&homedir)?;
             format!("~/{}", relpath.display())
         } else {
+            // repo lives outside home; show the absolute path as-is
             reporoot.to_string_lossy().into_owned()
         }
     } else {
+        // couldn't detect a home directory; fall back to the absolute path
         reporoot.to_string_lossy().into_owned()
     };
 
     Ok(cleanroot)
 }
 
+// prefixes any git subcommand invocation with the literal "git"
 fn createcommand<'a>(args: &[&'a str]) -> Vec<&'a str> {
     let mut command = vec!["git"];
     command.extend(args);
@@ -325,8 +358,10 @@ fn createcommand<'a>(args: &[&'a str]) -> Vec<&'a str> {
     command
 }
 
+// runs a git subcommand in `repopath` and returns the raw output or a formatted error string
 fn runcommand(repopath: &Path, args: &[&str]) -> Result<Output, String> {
     let commandparts = createcommand(args);
+    // echo the command so the user can see exactly what's being run
     printcommand(&commandparts);
 
     if commandparts.is_empty() {
@@ -338,6 +373,7 @@ fn runcommand(repopath: &Path, args: &[&str]) -> Result<Output, String> {
 
     let mut cmd = Command::new(command);
     cmd.args(commandargs);
+    // run in the repo root regardless of the user's cwd
     cmd.current_dir(repopath);
 
     match cmd.output() {
@@ -345,6 +381,7 @@ fn runcommand(repopath: &Path, args: &[&str]) -> Result<Output, String> {
             if o.status.success() {
                 Ok(o)
             } else {
+                // non-zero exit: surface stderr in the error string for the caller to inspect
                 let stderr = str::from_utf8(&o.stderr)
                     .unwrap_or("failed to read stderr (non-utf8)")
                     .trim();
@@ -356,6 +393,7 @@ fn runcommand(repopath: &Path, args: &[&str]) -> Result<Output, String> {
                 ))
             }
         }
+        // spawn failed (e.g. git not installed)
         Err(e) => Err(format!(
             "failed to execute command `{}` in directory `{}`: {}",
             style(commandparts.join(" ")).yellow(),
@@ -365,10 +403,12 @@ fn runcommand(repopath: &Path, args: &[&str]) -> Result<Output, String> {
     }
 }
 
+// `git add .` — stages every change under the repo root
 fn stageall(repopath: &Path, dryrun: &bool, verbose: &u8) -> Result<(), String> {
     debug("no files were specified, staging all", verbose);
     let args = &["add", "."];
 
+    // dry run: only print the command, do not touch the index
     if *dryrun {
         debug("debug was specified, not staging", verbose);
         printcommand(&args.to_vec());
@@ -387,6 +427,7 @@ fn stageall(repopath: &Path, dryrun: &bool, verbose: &u8) -> Result<(), String> 
     }
 }
 
+// `git add <files...>` — stages the caller-specified subset
 fn stage(repopath: &Path, files: &[String], dryrun: &bool, verbose: &u8) -> Result<(), String> {
     debug(&format!("files {:#?} were specified", files), verbose);
     let mut args = vec!["add".to_owned()];
@@ -407,6 +448,7 @@ fn stage(repopath: &Path, files: &[String], dryrun: &bool, verbose: &u8) -> Resu
             Ok(())
         }
         Err(e) => {
+            // distinguish "typo in filename" from other git failures for a clearer message
             if e.contains("did not match any files") {
                 debug(&format!("error: {}", e), verbose);
                 Err(String::from("    could not stage files: files not found"))
@@ -417,6 +459,7 @@ fn stage(repopath: &Path, files: &[String], dryrun: &bool, verbose: &u8) -> Resu
     }
 }
 
+// `git commit -m <message>` — commits whatever is currently staged
 fn commit(repopath: &Path, message: &str, dryrun: &bool, verbose: &u8) -> Result<(), String> {
     let args = &["commit", "-m", message];
 
@@ -428,11 +471,13 @@ fn commit(repopath: &Path, message: &str, dryrun: &bool, verbose: &u8) -> Result
 
     match runcommand(repopath, args) {
         Ok(o) => {
+            // pretty-print the commit summary rather than dumping raw git output
             printcommitoutput(o, verbose);
             Ok(())
         }
         Err(e) => {
             debug(&format!("    error: {}", e), verbose);
+            // most common cause is an empty index; hint at that in the error message
             Err(format!(
                 "    could not commit files. are there any changes to commit?"
             ))
@@ -440,6 +485,8 @@ fn commit(repopath: &Path, message: &str, dryrun: &bool, verbose: &u8) -> Result
     }
 }
 
+// `git push` — optionally sets upstream and escalates the force level based on -f count.
+// force==1 -> --force-with-lease (safer, checks upstream), force>=2 -> --force (unconditional).
 fn push(
     repopath: &Path,
     upstream: Option<&str>,
@@ -450,6 +497,7 @@ fn push(
     let mut args = vec!["push"];
     if let Some(upstreamval) = upstream {
         debug(&format!("upstream {} was specified", upstreamval), verbose);
+        // todo: allow a configurable remote name instead of hardcoding "origin"
         args.extend(["--set-upstream", "origin", upstreamval]);
     }
     if force.to_owned() == 1 {
@@ -470,6 +518,7 @@ fn push(
     debug("dry run was not specified, pushing", verbose);
     match runcommand(repopath, &args) {
         Ok(o) => {
+            // parse push output into a compact "To ...", "branch -> branch" summary
             printpushoutput(o, verbose);
             Ok(())
         }
@@ -480,6 +529,7 @@ fn push(
     }
 }
 
+// `git remote add <name> <url>` — currently always called with name="origin"
 fn addremote(
     repopath: &Path,
     remotename: &str,
@@ -503,6 +553,7 @@ fn addremote(
         }
         Err(e) => {
             debug(&format!("error: {}", e), verbose);
+            // git's usage output contains "[<options>]" when the url is missing
             if e.contains("[<options>]") {
                 Err("could not add remote: url not specified".to_string())
             } else {
@@ -512,6 +563,7 @@ fn addremote(
     }
 }
 
+// `git remote remove <name>` — currently always called with name="origin"
 fn removeremote(
     repopath: &Path,
     remotename: &str,
