@@ -37,8 +37,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         exit(0);
     }
 
-    if args().collect::<Vec<String>>()[1] == "meow" {
+    if args().collect::<Vec<String>>()[1] == "meow" && args().len() == 2 {
         println!("meow meow :3");
+        exit(0);
     }
 
     let args = match Args::try_parse() {
