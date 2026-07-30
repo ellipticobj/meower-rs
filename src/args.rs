@@ -101,8 +101,8 @@ pub struct Args {
 
     #[arg(
         long = "remove-remote",
-        aliases = ["rrm"],
+        aliases = ["rem"],
         help = "EXPERIMENTAL: same as git remote remove (remote name is 'origin' for now)"
     )]
-    pub removeremote: bool,
+    pub removeremote: Option<String>,
 }

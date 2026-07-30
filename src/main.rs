@@ -80,8 +80,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let verbose = args.verbose;
     let run = args.run;
     debug("initializing flags", &verbose);
-    let remoteadd = args.addremote;
-    let remoteremove = args.removeremote;
     let dryrun = args.dryrun;
     let force = args.force;
     let exitonerror = args.exitonerror;
@@ -182,70 +180,66 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // remote management short-circuits the pipeline: add/remove is the whole task
     // todo: allow a configurable remote name instead of hardcoding "origin"
     debug("checking if add remote was specified", &verbose);
-    if remoteadd.is_some() {
+    if let Some(s) = args.addremote {
         debug("add remote flag was specified", &verbose);
-        info("  EXPERIMENTAL: adding remote 'origin'...");
-        match addremote(
-            &reporoot,
-            "origin",
-            remoteadd.unwrap_or_default().as_str(),
-            &dryrun,
-            &verbose,
-        ) {
+        let (remotename, remoteurl) = s.split_once('/').unwrap_or_else(|| {
+                error("invalid remote format: expected 'NAME/URL' (like origin/git@github.com:ellipticobj/meower-rs.git)");
+                exit(1);
+            });
+        info(&format!("  adding remote '{}'...", remotename));
+        match addremote(&reporoot, remotename, remoteurl, &dryrun, &verbose) {
             Ok(r) => r,
             Err(e) => {
                 info("");
                 error(&e);
                 exit(1);
             }
-        };
-        // skip stage/commit/push when the user only wants to manage remotes
+        }
         runstagepipeline = false;
         runcommitpipeline = false;
         runpushpipeline = false;
+    } else {
+        debug("add remote flag not specified", &verbose);
     }
 
     debug("checking if remove remote was specified", &verbose);
-    if remoteremove {
+    if let Some(torem) = args.removeremote {
         debug("remove remote flag was specified", &verbose);
-        info("  EXPERIMENTAL: removing remote 'origin'...");
-        match removeremote(&reporoot, "origin", &dryrun, &verbose) {
+        info(&format!("  removing remote '{}'...", torem));
+        match removeremote(&reporoot, &torem, &dryrun, &verbose) {
             Ok(r) => r,
             Err(e) => {
                 info("");
                 error(&e);
                 exit(1);
             }
-        };
+        }
         runstagepipeline = false;
         runcommitpipeline = false;
         runpushpipeline = false;
+    } else {
+        debug("remove remote flag not specified", &verbose);
     }
 
     // stage stage: `-a` selects specific files, otherwise stage everything with `git add .`
     if runstagepipeline {
         info("staging changes...");
         debug("checking if files were specified to be staged", &verbose);
-        match args.add {
-            Some(toadd) => match stage(&reporoot, &toadd, &dryrun, &verbose) {
-                Err(e) => {
-                    error(&e);
-                    // by default we continue to the next stage; --exit makes any failure fatal
-                    if exitonerror {
-                        exit(1);
-                    }
+
+        if let Some(toadd) = args.add {
+            if let Err(e) = stage(&reporoot, &toadd, &dryrun, &verbose) {
+                error(&e);
+                if exitonerror {
+                    exit(1);
                 }
-                _ => (),
-            },
-            None => match stageall(&reporoot, &dryrun, &verbose) {
-                Err(e) => {
-                    error(&e);
-                    if exitonerror {
-                        exit(1);
-                    }
+            }
+        } else {
+            if let Err(e) = stageall(&reporoot, &dryrun, &verbose) {
+                error(&e);
+                if exitonerror {
+                    exit(1);
                 }
-                _ => (),
-            },
+            }
         }
         success("done");
     }
@@ -253,14 +247,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // commit stage
     if runcommitpipeline {
         info("\ncommitting...");
-        match commit(&reporoot, &message, &dryrun, &verbose) {
-            Err(e) => {
-                error(&e);
-                if exitonerror {
-                    exit(1);
-                }
+        if let Err(e) = commit(&reporoot, &message, &dryrun, &verbose) {
+            error(&e);
+            if exitonerror {
+                exit(1);
             }
-            _ => (),
         }
         success("done");
     }
@@ -268,20 +259,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // push stage: `-u <branch>` sets upstream, `-f`/`-ff` selects the force level
     if runpushpipeline {
         info("\npushing...");
-        match push(
+        if let Err(e) = push(
             &reporoot,
             args.upstream.as_deref(),
             &dryrun,
             &force,
             &verbose,
         ) {
-            Err(e) => {
-                error(&e);
-                if exitonerror {
-                    exit(1);
-                }
+            error(&e);
+            if exitonerror {
+                exit(1);
             }
-            _ => (),
         }
     }
     success("done");
@@ -332,7 +320,7 @@ fn getrootdir() -> Result<PathBuf, std::io::Error> {
 }
 
 // collapses the home-directory prefix into `~` for a shorter display path
-fn getcleanroot(reporoot: &PathBuf) -> Result<String, Box<dyn std::error::Error>> {
+fn getcleanroot(reporoot: &Path) -> Result<String, Box<dyn std::error::Error>> {
     let homediropt = my_home()?;
 
     let cleanroot = if let Some(homedir) = homediropt {
@@ -479,8 +467,8 @@ fn commit(repopath: &Path, message: &str, dryrun: &bool, verbose: &u8) -> Result
         Err(e) => {
             debug(&format!("    error: {}", e), verbose);
             // most common cause is an empty index; hint at that in the error message
-            Err(format!(
-                "    could not commit files. are there any changes to commit?"
+            Err(String::from(
+                "    could not commit files. are there any changes to commit?",
             ))
         }
     }
@@ -501,11 +489,11 @@ fn push(
         // todo: allow a configurable remote name instead of hardcoding "origin"
         args.extend(["--set-upstream", "origin", upstreamval]);
     }
-    if force.to_owned() == 1 {
+    if force == &1 {
         debug("force was specified, using force-with-lease", verbose);
         args.extend(["--force-with-lease"])
     }
-    if force.to_owned() >= 2 {
+    if force >= &2 {
         debug("force was specified twice, using force", verbose);
         args.extend(["--force"])
     }
